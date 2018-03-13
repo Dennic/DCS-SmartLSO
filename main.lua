@@ -29,7 +29,25 @@ timer.scheduleFunction(lso.main, nil, timer.getTime() + 1)
 lso.utils = {}
 lso.utils.math = {}
 
-function lso.utils.math.getOffset(l, k, d)
+"""
+计算斜率
+根据给定的航向，计算出航线斜率
+r:当前航向(弧度制)
+"""
+function lso.utils.math.getK(r)
+	local deg = 90 - math.deg(r) % 360
+	local k = tonumber(string.format("%.3f",math.tan(math.rad(deg))))
+	return k
+end
+
+"""
+计算x,y偏移量
+根据给定的偏移距离和航向，计算出向反朝向偏移所需移动的x,y偏移量
+l:偏移距离
+d:当前航向(弧度制)
+"""
+function lso.utils.math.getOffset(l, d)
+	local k = lso.utils.math.getK(d)
 	local dx = l / math.sqrt(math.pow(k, 2) + 1)
 	local dy = l * k / math.sqrt(math.pow(k, 2) + 1)
 	if (d % (math.pi * 2) > math.pi) then
@@ -39,15 +57,15 @@ function lso.utils.math.getOffset(l, k, d)
 	end
 end
 
-function lso.utils.math.getK(r)
-	local deg = 90 - math.deg(r) % 360
-	local k = tonumber(string.format("%.3f",math.tan(math.rad(deg))))
-	return k
-end
-
+"""
+计算偏移点坐标
+根据给定的偏移距离和航向，计算出向反朝向偏移后的点坐标
+x,y:基准点坐标
+h:当前朝向(弧度制)
+l:偏移距离
+"""
 function lso.utils.math.getOffsetPoint(x, y, h, l)
-	local k = lso.utils.math.getK(h)
-	local dx, dy = lso.utils.math.getOffset(l, k, h)
+	local dx, dy = lso.utils.math.getOffset(l, h)
 	return x+dx, y+dy
 end
 
@@ -64,21 +82,21 @@ function lso.test:onFrame()
 	local planePoint = plane:getPoint()
 	local shipHeadding = mist.getHeading(ship)
 	local planeHeadding = mist.getHeading(plane)
-	
+
 	local shipData = string.format("船位置 x=%.3f y=%.3f z=%.3f \n船航向 %.3f", shipPoint.x, shipPoint.y, shipPoint.z, shipHeadding)
 	local planeData = string.format("飞机位置 x=%.3f y=%.3f z=%.3f \n飞机航向 %.3f", planePoint.x, planePoint.y, planePoint.z, planeHeadding)
-	
+
 	local cx, cy = lso.utils.math.getOffsetPoint(shipPoint.z, shipPoint.x, shipHeadding, 58)
 	local bx, by = lso.utils.math.getOffsetPoint(cx, cy ,shipHeadding + math.pi * 0.5, 14)
-	
+
 	local offset = math.sqrt(math.pow(planePoint.z - bx, 2) + math.pow(planePoint.x - by, 2))
-	
-	local msg = {} 
-    msg.text = shipData .. "\n" .. planeData .. "\n接地点偏移：" .. offset
-    msg.displayTime = 5
-    msg.msgFor = {coa = {"all"}}
-    msg.name = "test"
-    mist.message.add(msg)
+
+	local msg = {}
+	msg.text = shipData .. "\n" .. planeData .. "\n接地点偏移：" .. offset
+	msg.displayTime = 5
+	msg.msgFor = {coa = {"all"}}
+	msg.name = "test"
+	mist.message.add(msg)
 end
 
 lso.addCheckFrame(lso.test)
