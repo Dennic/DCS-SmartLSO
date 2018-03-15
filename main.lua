@@ -41,8 +41,8 @@ function lso.init()
 	local carrier = {}
 	local unit = Unit.getByName(lso.carrierName)
 	local typeName = unit:getTypeName()
-	for k, data in pairs(lso.data.carriers) do
-		if (data.name == typeName) then
+	for name, data in pairs(lso.data.carriers) do
+		if (name == typeName) then
 			carrier.data = data
 			carrier.unit = unit
 			break
@@ -54,14 +54,27 @@ end
 
 lso.data = {}
 lso.data.carriers = {
-	KUZ = {
-		name = "KUZNECOW",
+	["KUZNECOW"] = {
 		offset = {58, 14.5},
 		height = 18.5,
 		deck = 8,
 		gs = 4,
 	}
 }
+lso.data.aircrafts = {
+	["Su-33"] = {
+		aoa = 9,
+	}
+}
+function lso.data.getAircraft(unit)
+	local typeName = unit:getTypeName()
+	for name, data in pairs(lso.data.aircrafts) do
+		if (name == typeName) then
+			return data
+		end
+	end
+	return nil
+end
 
 lso.utils = {}
 lso.utils.math = {}
@@ -147,6 +160,27 @@ function lso.utils.math.getInferiorAngle(a1, a2, degrees)
 	end
 end
 
+-- 计算方差
+-- 计算一组数据的方差
+-- data:数据 table
+function lso.utils.math.getVariance(data)
+	if (#data < 2) then
+		return 0
+	end
+	local avg = 0	-- 平均值
+	for i, v in ipairs(data) do
+		avg = avg + v
+	end
+	avg = avg / #data
+
+	local sum = 0
+	for i, v in ipairs(data) do
+		sum = sum + math.pow(v - avg, 2)
+	end
+
+	return sum / #data
+end
+
 function lso.utils.tableContains(t, k)
 	for key, val in pairs(t) do
 		if (key == k) then
@@ -229,11 +263,31 @@ end
 
 lso.approch = {}
 lso.approch.tracking = {}
+lso.approch.tracking.plane = {}
+lso.approch.tracking.data = {}
+function lso.approch.tracking.getTrackData(plane, dataType)
+	local trackData = lso.approch.tracking.data[plane:getName()] or {}
+	local data = {}
+	for k, v in ipairs(trackData) do
+		if (dataType == "gs") then
+			table.insert(data, v.gs)
+		elseif (dataType == "angle") then
+			table.insert(data, v.angle)
+		end
+	end
+	return data
+end
+
 lso.approch.status = {
 	HIGH = 1,
 	LOW = 2,
 	LEFT = 3,
 	RIGHT = 4,
+	EASY = 5,
+	FAST = 6,
+	SLOW = 7,
+	TOO_FAST = 8,
+	TOO_SLOW = 9,
 }
 
 lso.approch.message = {
@@ -241,6 +295,11 @@ lso.approch.message = {
 	[lso.approch.status.LOW] = "Power!",
 	[lso.approch.status.LEFT] = "Right for lineup!",
 	[lso.approch.status.RIGHT] = "Come left!",
+	[lso.approch.status.EASY] = "Easy with it.",
+	[lso.approch.status.FAST] = "Little fast.",
+	[lso.approch.status.SLOW] = "Little slow.",
+	[lso.approch.status.TOO_FAST] = "Too fast!",
+	[lso.approch.status.TOO_SLOW] = "Too slow!",
 }
 
 lso.approch.commands = {}
@@ -248,7 +307,7 @@ function lso.approch.showCommand(unit, msg, tag)
 	local unitName = unit:getName()
 	lso.approch.commands[unitName .. tag] = mist.message.add({
 		text = "LSO: " .. msg,
-		displayTime = 10,
+		displayTime = 3,
 		msgFor = {units={unitName}},
 		name = unitName .. tag,
 	})
@@ -273,10 +332,10 @@ function lso.approch.context.getStatus(unit)
 	return unitStatus
 end
 function lso.approch.context.addStatus(unit, status)
+	lso.approch.showCommand(unit, lso.approch.message[status], "status" .. status)
 	local unitStatus = lso.approch.context.getStatus(unit)
 	if (not lso.utils.listContains(unitStatus, status)) then
 		table.insert(unitStatus, status)
-		lso.approch.showCommand(unit, lso.approch.message[status], "status" .. status)
 		return true
 	else
 		return false
@@ -315,36 +374,59 @@ function lso.approch:onFrame()
 		local bearing = lso.utils.math.getBearing(lx, ly, planePoint.z, planePoint.x)
 		local angleOffset = lso.utils.getAngleOffset(bearing, true)
 		local gs = lso.utils.getGlideSlope(range, planePoint.y)
+		local aoa = math.deg(mist.getAoA(plane))
 
-		local track = (range <= 3200 and range > 50 and math.abs(angleOffset) <= 20 and math.abs(gs - lso.carrier.data.gs) < 2)
-
-		local data = string.format("偏移距 %.3f\n方位角 %.3f", range, math.deg(bearing))
-		local msg = string.format("偏离角 %.3f\n下滑道 %.3f", angleOffset, gs)
-
-		mist.message.add({
-			text = data .. "\n" .. msg .. "\n开始监视 " .. (track and "true" or "false"),
-			displayTime = 5,
-			msgFor = {coa = {"all"}},
-			name = "test",
-		})
+		local track = (range <= 4000 and range > 50 and math.abs(angleOffset) <= 20 and math.abs(gs - lso.carrier.data.gs) < 2)
 
 		if (track) then
-			lso.approch.tracking[plane:getName()] = {
+			lso.approch.tracking.plane[plane:getName()] = {
 				unit = plane,
 				range = range,
+				bearing = bearing,
 				angle = angleOffset,
 				gs = gs,
+				aoa = aoa,
 			}
+			local trackData = lso.approch.tracking.data[plane:getName()] or {}
+			table.insert(trackData, {angle=angleOffset, gs=gs})
+			if (#trackData > 10) then
+				table.remove(trackData, 1)
+			end
+			lso.approch.tracking.data[plane:getName()] = trackData
 		else
-			lso.approch.tracking[plane:getName()] = nil
+			lso.approch.tracking.plane[plane:getName()] = nil
+			lso.approch.tracking.data[plane:getName()] = nil
 		end
 	end
 
-	for name, plane in pairs(lso.approch.tracking) do
+	for name, plane in pairs(lso.approch.tracking.plane) do
+		local gsVariance = lso.utils.math.getVariance(lso.approch.tracking.getTrackData(plane.unit, "gs"))
+		local aircraft = lso.data.getAircraft(plane.unit)
+
+		-- local data = string.format("偏移距 %.3f\n方位角 %.3f", plane.range, math.deg(plane.bearing))
+		-- local msg = string.format("偏离角 %.3f\n下滑道 %.3f", plane.angle, plane.gs)
+		-- local variance = string.format("下滑道变化 %.3f", gsVariance)
+		-- local aoa = string.format("攻角 %.3f", plane.aoa)
+
+		-- mist.message.add({
+		-- 	text = plane.unit:getTypeName() .. "\n" .. data .. "\n" .. msg .. "\n" .. aoa .. "\n" .. variance,
+		-- 	-- text = data .. "\n" .. msg,
+		-- 	displayTime = 5,
+		-- 	msgFor = {units={plane.unit:getName()}},
+		-- 	name = plane.unit:getName() .. "test",
+		-- })
+
 		lso.approch.context.setStatus(plane.unit, lso.approch.status.HIGH, (plane.gs - lso.carrier.data.gs > 0.5))
 		lso.approch.context.setStatus(plane.unit, lso.approch.status.LOW, (plane.gs - lso.carrier.data.gs < -0.4))
 		lso.approch.context.setStatus(plane.unit, lso.approch.status.LEFT, (plane.angle > 1.5))
 		lso.approch.context.setStatus(plane.unit, lso.approch.status.RIGHT, (plane.angle < -1.5))
+		lso.approch.context.setStatus(plane.unit, lso.approch.status.EASY, (gsVariance > 0.05))
+
+		lso.approch.context.setStatus(plane.unit, lso.approch.status.FAST, (plane.aoa - aircraft.aoa < -0.5 and plane.aoa - aircraft.aoa >= -1))
+		lso.approch.context.setStatus(plane.unit, lso.approch.status.SLOW, (plane.aoa - aircraft.aoa > 0.5 and plane.aoa - aircraft.aoa <= 1))
+		lso.approch.context.setStatus(plane.unit, lso.approch.status.TOO_FAST, (plane.aoa - aircraft.aoa < -1))
+		lso.approch.context.setStatus(plane.unit, lso.approch.status.TOO_SLOW, (plane.aoa - aircraft.aoa > 1))
+
 	end
 
 end
