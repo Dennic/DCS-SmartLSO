@@ -371,7 +371,7 @@ lso.approch.command = {
 	LEFT = lso.RadioCommand:new("approch.LEFT", "Right for lineup!", nil, 2, lso.RadioCommand.Priority.NORMAL),
 	RIGHT = lso.RadioCommand:new("approch.RIGHT", "Come left!", nil, 2, lso.RadioCommand.Priority.NORMAL),
 	EASY = lso.RadioCommand:new("approch.EASY", "Easy with it.", nil, 2, lso.RadioCommand.Priority.NORMAL),
-	FAST = lso.RadioCommand:new("approch.FAST", "You're high!", nil, 2, lso.RadioCommand.Priority.NORMAL),
+	FAST = lso.RadioCommand:new("approch.FAST", "You're fast!", nil, 2, lso.RadioCommand.Priority.NORMAL),
 	SLOW = lso.RadioCommand:new("approch.SLOW", "You're slow!", nil, 2, lso.RadioCommand.Priority.NORMAL),
 }
 
@@ -543,9 +543,9 @@ function lso.approch:track()
 		if (track) then
 			self.tracking.plane[planeName] = plane
 			local trackData = self.tracking.data[planeName] or {}
-			table.insert(trackData, flightData)
+			table.insert(trackData, 1, flightData)
 			if (#trackData > 20) then -- 只记录最近20条飞行数据，即 20 * 0.1 = 2秒内数据
-				table.remove(trackData, 1)
+				table.remove(trackData, #trackData)
 			end
 			self.tracking.data[planeName] = trackData
 		else
@@ -573,25 +573,26 @@ function lso.approch:check()
 		local aoaDiff = flightData.aoa - aircraft.aoa
 
 		-- local data = string.format("偏移距 %.3f\n方位角 %.3f", flightData.range, math.deg(flightData.bearing))
-		-- local msg = string.format("偏离角 %.3f\n下滑道 %.3f", flightData.angle, flightData.gs)
-		-- local variance = string.format("下滑道变化 %.3f", gsVariance)
+		-- local msg = string.format("标准下滑道 %.3f\n下滑道 %.3f", lso.carrier.data.gs, flightData.gs)
+		-- local diff = string.format("偏移角 %.3f\n下滑道偏离 %.3f", flightData.angle, gsDiff)
 		-- local aoa = string.format("攻角 %.3f", flightData.aoa)
+		-- local variance = string.format("下滑道变化 %.3f", gsVariance)
 		-- mist.message.add({
-		-- 	text = plane:getTypeName() .. "\n" .. data .. "\n" .. msg .. "\n" .. aoa .. "\n" .. variance,
+		-- 	text = plane:getTypeName() .. "\n" .. data .. "\n" .. msg .. "\n" .. diff .. "\n" .. aoa .. "\n" .. variance,
 		-- 	displayTime = 5,
 		-- 	msgFor = {units={name}},
 		-- 	name = name .. "test",
 		-- })
 
-		self:setCommand(plane, self.command.HIGH, (gsDiff > 0.4))
-		self:setCommand(plane, self.command.LOW, (gsDiff < -0.3 and gsDiff >= -0.5))
+		self:setCommand(plane, self.command.HIGH, (gsDiff > 0.6))
+		self:setCommand(plane, self.command.LOW, (gsDiff < -0.3 and gsDiff >= -0.6))
 		self:setCommand(plane, self.command.TOO_LOW, (gsDiff < -0.4))
 		self:setCommand(plane, self.command.LEFT, (flightData.angle > 1.5))
 		self:setCommand(plane, self.command.RIGHT, (flightData.angle < -1.5))
 		self:setCommand(plane, self.command.EASY, (gsVariance > 0.03))
 
-		self:setCommand(plane, self.command.FAST, (aoaDiff < -1))
-		self:setCommand(plane, self.command.SLOW, (aoaDiff > 1))
+		self:setCommand(plane, self.command.FAST, (aoaDiff < -1.2))
+		self:setCommand(plane, self.command.SLOW, (aoaDiff > 1.2))
 
 	end
 end
