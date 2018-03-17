@@ -11,9 +11,8 @@ end
 local lso = {}
 lso.logger = mist.Logger:new("LSO", "info")
 
-
+-- 航母 unit name
 lso.carrierName = "ship"
-
 
 
 lso.frameId = 1
@@ -42,7 +41,7 @@ function lso.doFrame(arg, frameTime)
 		end
 		i = i + 1
 	end
-	return frameTime + 0.1
+	return frameTime + 0.2
 end
 
 timer.scheduleFunction(lso.doFrame, nil, timer.getTime() + 1)
@@ -100,6 +99,26 @@ function lso.RadioCommand.equalTo(self, another)
 end
 function lso.RadioCommand.toString(self)
 	return self.tag
+end
+function lso.RadioCommand:send(name, msgFor)
+	local messageID =  mist.message.add({
+		text = self.msg,
+		displayTime = self.duration,
+		msgFor = msgFor,
+		name = name
+	})
+	self.messageID = messageID
+	return messageID
+end
+function lso.RadioCommand:remove()
+	if (self.messageID) then
+		return mist.message.removeById(self.messageID)
+	else
+		return false
+	end
+end
+function lso.RadioCommand.removeById(id)
+	return mist.message.removeById(id)
 end
 
 lso.data = {}
@@ -240,15 +259,6 @@ function lso.utils.tableSize(t)
 	return count
 end
 
-function lso.utils.tableContains(t, k)
-	for key, val in pairs(t) do
-		if (key == k) then
-			return true
-		end
-	end
-	return false
-end
-
 function lso.utils.listContains(t, v)
 	for key, val in ipairs(t) do
 		if (val == v) then
@@ -268,6 +278,8 @@ function lso.utils.listRemove(t, v)
 	end
 end
 
+-- 计算当前航母的接地点坐标
+-- 返回值 bx, by: 接地点 vec2 坐标
 function  lso.utils.getLandingPoint()
 	local carrierPoint = lso.carrier.unit:getPoint()
 	local carrierHeadding = mist.getHeading(lso.carrier.unit, true)
@@ -276,11 +288,18 @@ function  lso.utils.getLandingPoint()
 	return bx, by
 end
 
-
+-- 根据距离和高度，计算出当前所处下滑道角度
+-- distance: 距离
+-- altitude: 高度
+-- 返回值: 下滑道角度
 function lso.utils.getGlideSlope(distance, altitude)
 	return math.deg(math.atan((altitude - lso.carrier.data.height)/distance))
 end
 
+-- 计算当前航向相对于当前着陆甲板朝向的角度偏差
+-- bearing: 当前航向
+-- degrees: 是否返回角度值
+-- 返回值: 角度偏差
 function lso.utils.getAngleOffset(bearing, degrees)
 	local carrierHeadding = mist.getHeading(lso.carrier.unit, true)
 	local stdAngle = (carrierHeadding - math.rad(lso.carrier.data.deck) + math.pi) % (math.pi * 2)
@@ -292,6 +311,7 @@ function lso.utils.getAngleOffset(bearing, degrees)
 	end
 end
 
+-- 计算两点欧氏距离
 function lso.utils.getDistance(x1, y1, x2, y2)
 	return math.sqrt(math.pow(x1 - x2, 2) + math.pow(y1 - y2, 2))
 end
@@ -353,26 +373,22 @@ function lso.approch.tracking:getTrackData(plane, dataType)
 	local trackData = self.data[name] or {}
 	local data = {}
 	for k, v in ipairs(trackData) do
-		if (dataType == "gs") then
-			table.insert(data, v.gs)
-		elseif (dataType == "angle") then
-			table.insert(data, v.angle)
-		elseif (dataType == "aoa") then
-			table.insert(data, v.aoa)
+		if (v[dataType] ~= nil) then
+			table.insert(data, v[dataType])
 		end
 	end
 	return data
 end
 
 lso.approch.command = {
-	HIGH = lso.RadioCommand:new("approch.HIGH", "You're high!", nil, 2, lso.RadioCommand.Priority.NORMAL),
-	LOW = lso.RadioCommand:new("approch.LOW", "Little power!", nil, 2, lso.RadioCommand.Priority.NORMAL),
-	TOO_LOW = lso.RadioCommand:new("approch.TOO_LOW", "Power!", nil, 2, lso.RadioCommand.Priority.HIGH),
-	LEFT = lso.RadioCommand:new("approch.LEFT", "Right for lineup!", nil, 2, lso.RadioCommand.Priority.NORMAL),
-	RIGHT = lso.RadioCommand:new("approch.RIGHT", "Come left!", nil, 2, lso.RadioCommand.Priority.NORMAL),
-	EASY = lso.RadioCommand:new("approch.EASY", "Easy with it.", nil, 2, lso.RadioCommand.Priority.NORMAL),
-	FAST = lso.RadioCommand:new("approch.FAST", "You're fast!", nil, 2, lso.RadioCommand.Priority.NORMAL),
-	SLOW = lso.RadioCommand:new("approch.SLOW", "You're slow!", nil, 2, lso.RadioCommand.Priority.NORMAL),
+	HIGH = lso.RadioCommand:new("approch.HIGH", "LSO: You're high!", nil, 2, lso.RadioCommand.Priority.NORMAL),
+	LOW = lso.RadioCommand:new("approch.LOW", "LSO: Little power!", nil, 2, lso.RadioCommand.Priority.NORMAL),
+	TOO_LOW = lso.RadioCommand:new("approch.TOO_LOW", "LSO: Power!", nil, 2, lso.RadioCommand.Priority.HIGH),
+	LEFT = lso.RadioCommand:new("approch.LEFT", "LSO: Right for lineup!", nil, 2, lso.RadioCommand.Priority.NORMAL),
+	RIGHT = lso.RadioCommand:new("approch.RIGHT", "LSO: Come left!", nil, 2, lso.RadioCommand.Priority.NORMAL),
+	EASY = lso.RadioCommand:new("approch.EASY", "LSO: Easy with it.", nil, 2, lso.RadioCommand.Priority.NORMAL),
+	FAST = lso.RadioCommand:new("approch.FAST", "LSO: You're fast!", nil, 2, lso.RadioCommand.Priority.NORMAL),
+	SLOW = lso.RadioCommand:new("approch.SLOW", "LSO: You're slow!", nil, 2, lso.RadioCommand.Priority.NORMAL),
 }
 
 lso.approch.commands = {}
@@ -380,7 +396,7 @@ function lso.approch:showCommand(unit, cmd)
 	local unitName = unit:getName()
 	local commandData = self.commands[unitName] or {}
 	local nowTime = timer.getTime()
-	if (commandData.currentCommand and commandData.sendTime and commandData.message) then
+	if (commandData.currentCommand and commandData.sendTime) then
 		local prior = cmd.priority > commandData.currentCommand.priority
 		local endTime = commandData.sendTime + commandData.currentCommand.duration
 		if (prior or nowTime >= endTime) then
@@ -418,12 +434,7 @@ function lso.approch:showCommand(unit, cmd)
 	else
 		commandData.currentCommand = cmd
 		commandData.sendTime = nowTime
-		commandData.message = mist.message.add({
-			text = "LSO: " .. cmd.msg,
-			displayTime = cmd.duration,
-			msgFor = {units={unitName}},
-			name = unitName..":"..cmd.tag,
-		})
+		commandData.message = cmd:send(unitName .. "approch", {units={unitName}})
 		self.commands[unitName] = commandData
 		return true
 	end
@@ -432,23 +443,19 @@ function lso.approch:dismissCommand(unit, cmd)
 	local unitName = unit:getName()
 	local commandData = self.commands[unitName] or {}
 	local nowTime = timer.getTime()
-	if (commandData.currentCommand and commandData.sendTime and commandData.message) then
-		if (nowTime <= commandData.sendTime + commandData.currentCommand.duration) then
-			mist.message.removeById(commandData.message)
-			local cd = commandData.coolDown or {}
-			cd[commandData.currentCommand.tag] = {
-				command = commandData.currentCommand,
-				coolTime = nowTime + 2
-			}
-			commandData.coolDown = cd
-			commandData.message = nil
-			commandData.sendTime = nil
-			commandData.currentCommand = nil
-			self.commands[unitName] = commandData
-			return true
-		else
-			return false
-		end
+	cmd:remove()
+	if (commandData.currentCommand and commandData.sendTime and commandData.currentCommand == cmd) then
+		local endTime = commandData.sendTime + commandData.currentCommand.duration
+		local cd = commandData.coolDown or {}
+		cd[commandData.currentCommand.tag] = {
+			command = commandData.currentCommand,
+			coolTime = endTime + 2
+		}
+		commandData.coolDown = cd
+		commandData.message = nil
+		commandData.sendTime = nil
+		commandData.currentCommand = nil
+		self.commands[unitName] = commandData
 	end
 end
 function lso.approch:setCommand(unit, cmd, set)
@@ -466,52 +473,6 @@ function lso.approch:clearCommand(unit)
 	self.commands[unitName] = nil
 end
 
--- lso.approch.context = {}
--- lso.approch.context.status = {}
---
--- function lso.approch.context.getStatus(unit)
--- 	local unitStatus = lso.approch.context.status[unit:getName()]
--- 	if (not unitStatus) then
--- 		unitStatus = {}
--- 		lso.approch.context.status[unit:getName()] = unitStatus
--- 	end
--- 	return unitStatus
--- end
--- function lso.approch.context.setStatus(unit, status, toggle)
--- 	if (toggle) then
--- 		lso.approch.context.addStatus(unit, status)
--- 	else
--- 		lso.approch.context.removeStatus(unit, status)
--- 	end
--- end
--- function lso.approch.context.clearStatus(unit)
--- 	lso.approch.context.status[unit:getName()] = nil
--- end
--- function lso.approch.context.hasStatus(unit, status)
--- 	local unitStatus = lso.approch.context.getStatus(unit)
--- 	return lso.utils.listContains(unitStatus, status)
--- end
--- function lso.approch.context.addStatus(unit, status)
--- 	lso.approch.showCommand(unit, lso.approch.message[status], "status" .. status)
--- 	local unitStatus = lso.approch.context.getStatus(unit)
--- 	if (not lso.utils.listContains(unitStatus, status)) then
--- 		table.insert(unitStatus, status)
--- 		return true
--- 	else
--- 		return false
--- 	end
--- end
--- function lso.approch.context.removeStatus(unit, status)
--- 	local unitStatus = lso.approch.context.getStatus(unit)
--- 	if (lso.utils.listContains(unitStatus, status)) then
--- 		lso.utils.listRemove(unitStatus, status)
--- 		lso.approch.dismissCommand(unit, "status" .. status)
--- 		return true
--- 	else
--- 		return false
--- 	end
--- end
-
 function lso.approch:track()
 	local allPlanes = mist.makeUnitTable({"[all][plane]"})
 	local lx, ly = lso.utils.getLandingPoint()
@@ -528,12 +489,19 @@ function lso.approch:track()
 			local angleOffset = lso.utils.getAngleOffset(bearing, true)
 			local gs = lso.utils.getGlideSlope(range, planePoint.y)
 			local aoa = math.deg(mist.getAoA(plane))
+			local previousData = self.tracking:getData(planeName)
+			local vs = nil
+			if (previousData ~= nil) then
+				vs = (planePoint.y - previousData.atltitude) * 5
+			end
 			flightData = {
 				range = range,
 				bearing = bearing,
 				angle = angleOffset,
 				gs = gs,
 				aoa = aoa,
+				atltitude = planePoint.y,
+				vs = vs,
 			}
 		 	track = (range <= 4000 and math.abs(angleOffset) <= 20 and math.abs(gs - lso.carrier.data.gs) < 2)
 		else
@@ -544,7 +512,7 @@ function lso.approch:track()
 			self.tracking.plane[planeName] = plane
 			local trackData = self.tracking.data[planeName] or {}
 			table.insert(trackData, 1, flightData)
-			if (#trackData > 20) then -- 只记录最近20条飞行数据，即 20 * 0.1 = 2秒内数据
+			if (#trackData > 10) then -- 只记录最近20条飞行数据，即 10 * 0.2 = 2秒内数据
 				table.remove(trackData, #trackData)
 			end
 			self.tracking.data[planeName] = trackData
@@ -568,7 +536,8 @@ function lso.approch:check()
 	for name, plane in pairs(self.tracking.plane) do
 		local flightData = self.tracking:getData(name)
 		local aircraft = lso.data.getAircraft(plane)
-		local gsVariance = lso.utils.math.getVariance(self.tracking:getTrackData(name, "gs"))
+		-- local gsVariance = lso.utils.math.getVariance(self.tracking:getTrackData(name, "gs"))
+		local vsVariance = lso.utils.math.getVariance(self.tracking:getTrackData(name, "vs"))
 		local gsDiff = flightData.gs - lso.carrier.data.gs
 		local aoaDiff = flightData.aoa - aircraft.aoa
 
@@ -576,7 +545,7 @@ function lso.approch:check()
 		-- local msg = string.format("标准下滑道 %.3f\n下滑道 %.3f", lso.carrier.data.gs, flightData.gs)
 		-- local diff = string.format("偏移角 %.3f\n下滑道偏离 %.3f", flightData.angle, gsDiff)
 		-- local aoa = string.format("攻角 %.3f", flightData.aoa)
-		-- local variance = string.format("下滑道变化 %.3f", gsVariance)
+		-- local variance = string.format("下滑道变化 %.3f\n垂速变化 %.3f", gsVariance or 0, vsVariance or 0)
 		-- mist.message.add({
 		-- 	text = plane:getTypeName() .. "\n" .. data .. "\n" .. msg .. "\n" .. diff .. "\n" .. aoa .. "\n" .. variance,
 		-- 	displayTime = 5,
@@ -584,12 +553,12 @@ function lso.approch:check()
 		-- 	name = name .. "test",
 		-- })
 
-		self:setCommand(plane, self.command.HIGH, (gsDiff > 0.6))
-		self:setCommand(plane, self.command.LOW, (gsDiff < -0.3 and gsDiff >= -0.6))
 		self:setCommand(plane, self.command.TOO_LOW, (gsDiff < -0.4))
+		self:setCommand(plane, self.command.LOW, (gsDiff < -0.3 and gsDiff >= -0.6))
+		self:setCommand(plane, self.command.HIGH, (gsDiff > 0.6))
 		self:setCommand(plane, self.command.LEFT, (flightData.angle > 1.5))
 		self:setCommand(plane, self.command.RIGHT, (flightData.angle < -1.5))
-		self:setCommand(plane, self.command.EASY, (gsVariance > 0.03))
+		self:setCommand(plane, self.command.EASY, (vsVariance > 1))
 
 		self:setCommand(plane, self.command.FAST, (aoaDiff < -1.2))
 		self:setCommand(plane, self.command.SLOW, (aoaDiff > 1.2))
