@@ -41,7 +41,7 @@ function lso.doFrame(arg, frameTime)
 		end
 		i = i + 1
 	end
-	return frameTime + 0.2
+	return timer.getTime() + 2
 end
 
 timer.scheduleFunction(lso.doFrame, nil, timer.getTime() + 1)
@@ -316,63 +316,38 @@ function lso.utils.getDistance(x1, y1, x2, y2)
 	return math.sqrt(math.pow(x1 - x2, 2) + math.pow(y1 - y2, 2))
 end
 
-lso.test = {}
-
-function lso.test:onFrame()
-	local plane = Unit.getByName("plane")
-	local planePoint = plane:getPoint()
-	local lx, ly = lso.utils.getLandingPoint()
-
-	local pointOffset = lso.utils.getDistance(planePoint.z, planePoint.x, lx, ly)
-	local bearing = lso.utils.math.getBearing(lx, ly, planePoint.z, planePoint.x)
-	local angleOffset = lso.utils.getAngleOffset(bearing, true)
-	local gs = lso.utils.getGlideSlope(pointOffset, planePoint.y)
-
-	local data = string.format("偏移距 %.3f\n方位角 %.3f", pointOffset, math.deg(bearing))
-	local msg = string.format("偏离角 %.3f\n下滑道 %.3f", angleOffset, gs)
-
-	mist.message.add({
-		text = data .. "\n" .. msg,
-		displayTime = 5,
-		msgFor = {coa = {"all"}},
-		name = "test",
-	})
-end
-
 
 lso.approch = {}
-
 lso.approch.radio = {}
-
 lso.approch.tracking = {}
-lso.approch.tracking.plane = {}
-lso.approch.tracking.data = {}
-function lso.approch.tracking:getData(plane)
-	local name
-	if (type(plane) == "string") then
-		name = plane
-	else
-		name = plane:getName()
-	end
-	local trackData = self.data[name] or {}
-	if (#trackData > 0) then
-		return trackData[1]
+
+lso.approch.TrackData = {plane, data}
+function lso.approch.TrackData:new(unit)
+		assert(unit ~= nil, "TrackData: unit cannot be nil");
+		local obj = {
+			plane = unit,
+			data = {},
+		}
+		setmetatable(obj, {__index = self})
+		return obj
+end
+function lso.approch.TrackData:addData(flightData)
+		table.insert(self.data, 1, flightData)
+		if (#self.data > 20) then -- 只记录最近20条飞行数据，即 20 * 0.1 = 2秒内数据
+			table.remove(self.data, #self.data)
+		end
+end
+function lso.approch.TrackData:getData()
+	if (#self.data > 0) then
+		return self.data[1]
 	else
 		return nil
 	end
 end
-
-function lso.approch.tracking:getTrackData(plane, dataType)
-	local name
-	if (type(plane) == "string") then
-		name = plane
-	else
-		name = plane:getName()
-	end
+function lso.approch.TrackData:getDataRecord(dataType)
 	dataType = string.lower(dataType)
-	local trackData = self.data[name] or {}
 	local data = {}
-	for k, v in ipairs(trackData) do
+	for k, v in ipairs(self.data) do
 		if (v[dataType] ~= nil) then
 			table.insert(data, v[dataType])
 		end
@@ -476,25 +451,52 @@ end
 function lso.approch:track()
 	local allPlanes = mist.makeUnitTable({"[all][plane]"})
 	local lx, ly = lso.utils.getLandingPoint()
-
 	for i, planeName in ipairs(allPlanes) do
-
 		local plane = Unit.getByName(planeName)
-
-		local track, flightData
 		if (plane and plane:isActive() and plane:isExist() and plane:getPlayerName() ~= nil) then
 			local planePoint = plane:getPoint()
 			local range = lso.utils.getDistance(planePoint.z, planePoint.x, lx, ly)
 			local bearing = lso.utils.math.getBearing(lx, ly, planePoint.z, planePoint.x)
 			local angleOffset = lso.utils.getAngleOffset(bearing, true)
 			local gs = lso.utils.getGlideSlope(range, planePoint.y)
+		 	track = (range <= 4000 and math.abs(angleOffset) <= 20 and math.abs(gs - lso.carrier.data.gs) < 2)
+			if (track) then
+				self:check(plane)
+			end
+		end
+	end
+	-- mist.message.add({
+	-- 	text =  "检测中",
+	-- 	displayTime = 1,
+	-- 	msgFor = {coa = {"all"}},
+	-- 	name = "tracking",
+	-- })
+end
+
+function lso.approch:check(unit)
+
+	if (self.tracking[unit:getName()]) then
+		return false
+	end
+
+	local aircraft = lso.data.getAircraft(unit)
+	local trackData = self.TrackData:new(unit)
+	local trackFrame = function(args, trackTime)
+		local plane = trackData.plane
+		if (plane and plane:isActive() and plane:isExist() and plane:getPlayerName() ~= nil) then
+			local planePoint = plane:getPoint()
+			local lx, ly = lso.utils.getLandingPoint()
+			local range = lso.utils.getDistance(planePoint.z, planePoint.x, lx, ly)
+			local bearing = lso.utils.math.getBearing(lx, ly, planePoint.z, planePoint.x)
+			local angleOffset = lso.utils.getAngleOffset(bearing, true)
+			local gs = lso.utils.getGlideSlope(range, planePoint.y)
 			local aoa = math.deg(mist.getAoA(plane))
-			local previousData = self.tracking:getData(planeName)
+			local previousData = trackData:getData()
 			local vs = nil
 			if (previousData ~= nil) then
 				vs = (planePoint.y - previousData.atltitude) * 5
 			end
-			flightData = {
+			local flightData = {
 				range = range,
 				bearing = bearing,
 				angle = angleOffset,
@@ -503,74 +505,56 @@ function lso.approch:track()
 				atltitude = planePoint.y,
 				vs = vs,
 			}
-		 	track = (range <= 4000 and math.abs(angleOffset) <= 20 and math.abs(gs - lso.carrier.data.gs) < 2)
-		else
-			track = false
-		end
-
-		if (track) then
-			self.tracking.plane[planeName] = plane
-			local trackData = self.tracking.data[planeName] or {}
-			table.insert(trackData, 1, flightData)
-			if (#trackData > 10) then -- 只记录最近20条飞行数据，即 10 * 0.2 = 2秒内数据
-				table.remove(trackData, #trackData)
+		 	waveOff = (math.abs(angleOffset) > 20 and math.abs(gs - lso.carrier.data.gs) > 2)
+			if (not waveOff) then
+				trackData:addData(flightData)
+			else
+				self:clearCommand(plane)
+				self.tracking[plane:getName()] = nil
+				return nil
 			end
-			self.tracking.data[planeName] = trackData
+
+			local vsVariance = lso.utils.math.getVariance(trackData:getDataRecord("vs"))
+			local gsDiff = gs - lso.carrier.data.gs
+			local aoaDiff = aoa - aircraft.aoa
+
+			-- local data = string.format("偏移距 %.3f\n方位角 %.3f", range, math.deg(bearing))
+			-- local msg = string.format("标准下滑道 %.3f\n下滑道 %.3f", lso.carrier.data.gs, gs)
+			-- local diff = string.format("偏移角 %.3f\n下滑道偏离 %.3f", angleOffset, gsDiff)
+			-- local aoa = string.format("攻角 %.3f", aoa)
+			-- local variance = string.format("垂速变化 %.3f", vsVariance or 0)
+			-- mist.message.add({
+			-- 	text = plane:getTypeName() .. "\n" .. data .. "\n" .. msg .. "\n" .. diff .. "\n" .. aoa .. "\n" .. variance,
+			-- 	displayTime = 5,
+			-- 	msgFor = {units={plane:getName()}},
+			-- 	name = plane:getName() .. "test",
+			-- })
+
+			self:setCommand(plane, self.command.TOO_LOW, (gsDiff < -0.4))
+			self:setCommand(plane, self.command.LOW, (gsDiff < -0.3 and gsDiff >= -0.6))
+			self:setCommand(plane, self.command.HIGH, (gsDiff > 0.6))
+			self:setCommand(plane, self.command.LEFT, (angleOffset > 1.5))
+			self:setCommand(plane, self.command.RIGHT, (angleOffset < -1.5))
+			self:setCommand(plane, self.command.EASY, (vsVariance > 1))
+
+			self:setCommand(plane, self.command.FAST, (aoaDiff < -1.2))
+			self:setCommand(plane, self.command.SLOW, (aoaDiff > 1.2))
+
+			return timer.getTime() + 0.1
 		else
-			self.tracking.plane[planeName] = nil
-			self.tracking.data[planeName] = nil
-			self:clearCommand(planeName)
+			self.tracking[plane:getName()] = nil
+			return nil
 		end
-
 	end
 
-	-- mist.message.add({
-	-- 	text =  "检测中数量 " .. lso.utils.tableSize(self.tracking.plane),
-	-- 	displayTime = 1,
-	-- 	msgFor = {coa = {"all"}},
-	-- 	name = "tracking",
-	-- })
-end
-
-function lso.approch:check()
-	for name, plane in pairs(self.tracking.plane) do
-		local flightData = self.tracking:getData(name)
-		local aircraft = lso.data.getAircraft(plane)
-		-- local gsVariance = lso.utils.math.getVariance(self.tracking:getTrackData(name, "gs"))
-		local vsVariance = lso.utils.math.getVariance(self.tracking:getTrackData(name, "vs"))
-		local gsDiff = flightData.gs - lso.carrier.data.gs
-		local aoaDiff = flightData.aoa - aircraft.aoa
-
-		-- local data = string.format("偏移距 %.3f\n方位角 %.3f", flightData.range, math.deg(flightData.bearing))
-		-- local msg = string.format("标准下滑道 %.3f\n下滑道 %.3f", lso.carrier.data.gs, flightData.gs)
-		-- local diff = string.format("偏移角 %.3f\n下滑道偏离 %.3f", flightData.angle, gsDiff)
-		-- local aoa = string.format("攻角 %.3f", flightData.aoa)
-		-- local variance = string.format("下滑道变化 %.3f\n垂速变化 %.3f", gsVariance or 0, vsVariance or 0)
-		-- mist.message.add({
-		-- 	text = plane:getTypeName() .. "\n" .. data .. "\n" .. msg .. "\n" .. diff .. "\n" .. aoa .. "\n" .. variance,
-		-- 	displayTime = 5,
-		-- 	msgFor = {units={name}},
-		-- 	name = name .. "test",
-		-- })
-
-		self:setCommand(plane, self.command.TOO_LOW, (gsDiff < -0.4))
-		self:setCommand(plane, self.command.LOW, (gsDiff < -0.3 and gsDiff >= -0.6))
-		self:setCommand(plane, self.command.HIGH, (gsDiff > 0.6))
-		self:setCommand(plane, self.command.LEFT, (flightData.angle > 1.5))
-		self:setCommand(plane, self.command.RIGHT, (flightData.angle < -1.5))
-		self:setCommand(plane, self.command.EASY, (vsVariance > 1))
-
-		self:setCommand(plane, self.command.FAST, (aoaDiff < -1.2))
-		self:setCommand(plane, self.command.SLOW, (aoaDiff > 1.2))
-
-	end
+	local id = timer.scheduleFunction(trackFrame, nil, timer.getTime() + 2)
+	self.tracking[unit:getName()] = id
+	return true
 end
 
 function lso.approch:onFrame()
 	self:track()
-	self:check()
 end
 
 lso.init()
--- lso.addCheckFrame(lso.test)
 lso.approch.id = lso.addCheckFrame(lso.approch)
