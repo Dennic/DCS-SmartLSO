@@ -316,6 +316,18 @@ function lso.utils.getDistance(x1, y1, x2, y2)
 	return math.sqrt(math.pow(x1 - x2, 2) + math.pow(y1 - y2, 2))
 end
 
+-- 获取飞机垂直速度 m/s
+function lso.utils.getVerticalSpeed(plane)
+	local unit
+	if (type(plane) == "string") then
+		unit = Unit.getByName(plane)
+	else
+		unit = plane
+	end
+	local unitVel = unit:getVelocity()
+	return unitVel.y
+end
+
 
 lso.approch = {}
 lso.approch.radio = {}
@@ -491,11 +503,7 @@ function lso.approch:check(unit)
 			local angleOffset = lso.utils.getAngleOffset(bearing, true)
 			local gs = lso.utils.getGlideSlope(range, planePoint.y)
 			local aoa = math.deg(mist.getAoA(plane))
-			local previousData = trackData:getData()
-			local vs = nil
-			if (previousData ~= nil) then
-				vs = (planePoint.y - previousData.atltitude) * 5
-			end
+			local vs = lso.utils.getVerticalSpeed(plane)
 			local flightData = {
 				range = range,
 				bearing = bearing,
@@ -522,9 +530,9 @@ function lso.approch:check(unit)
 			-- local msg = string.format("标准下滑道 %.3f\n下滑道 %.3f", lso.carrier.data.gs, gs)
 			-- local diff = string.format("偏移角 %.3f\n下滑道偏离 %.3f", angleOffset, gsDiff)
 			-- local aoa = string.format("攻角 %.3f", aoa)
-			-- local variance = string.format("垂速变化 %.3f", vsVariance or 0)
+			-- local vs = string.format("垂直速度 %.3f\n垂速变化 %.3f", vs, vsVariance or 0)
 			-- mist.message.add({
-			-- 	text = plane:getTypeName() .. "\n" .. data .. "\n" .. msg .. "\n" .. diff .. "\n" .. aoa .. "\n" .. variance,
+			-- 	text = plane:getTypeName() .. "\n" .. data .. "\n" .. msg .. "\n" .. diff .. "\n" .. aoa .. "\n" .. vs,
 			-- 	displayTime = 5,
 			-- 	msgFor = {units={plane:getName()}},
 			-- 	name = plane:getName() .. "test",
