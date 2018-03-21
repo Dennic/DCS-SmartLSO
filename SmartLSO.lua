@@ -124,7 +124,7 @@ end
 lso.data = {}
 lso.data.carriers = {
 	["KUZNECOW"] = {
-		offset = {58, 14.5},
+		offset = {188.67, 58.02},
 		height = 18.5,
 		deck = 8,
 		gs = 4,
@@ -146,87 +146,114 @@ function lso.data.getAircraft(unit)
 end
 
 lso.utils = {}
-lso.utils.math = {}
+lso.utils.math ={}
 
--- 计算斜率
--- 根据给定的航向，计算出航线斜率
--- r:当前航向(弧度)
-function lso.utils.math.getK(r)
-	local deg = 90 - math.deg(r) % 360
-	local k = tonumber(string.format("%.3f",math.tan(math.rad(deg))))
-	return k
-end
-
--- 计算x,y偏移量
--- 根据给定的偏移距离和航向，计算出向反朝向偏移所需移动的x,y偏移量
--- l:偏移距离
--- d:当前航向(弧度)
-function lso.utils.math.getOffset(l, d)
-	local k = lso.utils.math.getK(d)
-	local dx = l / math.sqrt(math.pow(k, 2) + 1)
-	local dy = l * k / math.sqrt(math.pow(k, 2) + 1)
-	if (d % (math.pi * 2) > math.pi) then
-		return dx, dy
+function lso.utils.math.dirToAngle(direction, degrees)
+	local dir
+	if (degrees) then
+		dir = direction
 	else
-		return -dx, -dy
+		dir = math.deg(direction)
+	end
+	local diff = 450 - dir
+	local angle
+	if (dir > 90 and dir < 270) then
+		angle = -(360 % diff)
+	else
+		angle = diff % 360
+	end
+	if (degrees) then
+		return angle
+	else
+		return math.rad(angle)
+	end
+end
+function lso.utils.math.angleToDir(angle, degrees)
+	local agl
+	if (degrees) then
+		agl = angle
+	else
+		agl = math.deg(angle)
+	end
+	local diff = agl - 90
+	local dir
+	if (diff > 0) then
+		dir = 450 - agl
+	else
+		dir = math.abs(diff)
+	end
+	if (degrees) then
+		return dir
+	else
+		return math.rad(dir)
 	end
 end
 
--- 计算偏移点坐标
--- 根据给定的偏移距离和航向，计算出向反朝向偏移后的点坐标
--- x,y:基准点坐标
--- h:当前朝向(弧度)
--- l:偏移距离
-function lso.utils.math.getOffsetPoint(x, y, h, l)
-	local dx, dy = lso.utils.math.getOffset(l, h)
-	return x+dx, y+dy
+function lso.utils.math.getOffsetPoint(x, y, dir, dist)
+	local angle = math.rad(lso.utils.math.dirToAngle(dir, true))
+	local dx = math.cos(angle) * dist
+	local dy = math.sin(angle) * dist
+	return x + dx, y + dy
 end
+
 
 -- 计算相对方位角
 -- 根据给定的坐标，计算出两点的相对方位角
 -- xs,ys:基准点坐标
 -- xt,yt:目标点坐标
 -- degrees:布尔值，是否返回角度（默认返回弧度）
-function  lso.utils.math.getBearing(xs, ys, xt, yt, degrees)
+function  lso.utils.math.getAzimuth(xs, ys, xt, yt, degrees)
 	local dx = xt - xs
 	local dy = yt - ys
 
 	if (dx == 0) then
 		return 0
 	else
-		local deg = 90 - math.deg(math.atan(dy/dx))
+		local deg = lso.utils.math.angleToDir(math.atan(dy/dx))
 		if (xt < xs) then
-			deg = deg + 180
+			deg = deg + math.pi
 		end
-		if (type(degrees) == "boolean" and degrees) then
-			return deg
+		if (degrees) then
+			return math.deg(deg)
 		else
-			return math.rad(deg)
+			return deg
 		end
 	end
 end
 
--- 计算劣角
--- 根据给定两个角度，计算劣角
--- a1,a2:两个给定角度
--- degrees:布尔值，参数和返回值是否为角度（默认为弧度）
-function lso.utils.math.getInferiorAngle(a1, a2, degrees)
-	local da = math.abs(a2 - a1)
-	local ia = 0
-	if (type(degrees) == "boolean" and degrees) then
-		if (da > 180) then
-			da = 360 - da
-		end
+function lso.utils.math.getAzimuthError(a1, a2, degrees)
+	local diff
+	if (degrees) then
+		diff = a1 - a2
 	else
-		if (da > math.pi) then
-			da = 2 * math.pi - da
-		end
+		diff = math.deg(a1-a2)
 	end
-	if (a2 > a1) then
-		return da
+	local angleDiff
+	if (diff <= 180) then
+		 angleDiff = diff
 	else
-		return -da
+		angleDiff = diff - 360
 	end
+	if (degrees) then
+		return angleDiff
+	else
+		return math.rad(angleDiff)
+	end
+end
+
+-- 计算平均值
+-- 计算一组数据的平均值
+-- data:数据 table
+function lso.utils.math.getAverage(data)
+	if (#data == 0) then
+		return 0
+	end
+	local avg = 0	-- 平均值
+	for i, v in ipairs(data) do
+		avg = avg + v
+	end
+	avg = avg / #data
+	return avg
 end
 
 -- 计算方差
@@ -236,18 +263,29 @@ function lso.utils.math.getVariance(data)
 	if (#data < 2) then
 		return 0
 	end
-	local avg = 0	-- 平均值
-	for i, v in ipairs(data) do
-		avg = avg + v
-	end
-	avg = avg / #data
-
+	local avg = lso.utils.math.getAverage(data)
 	local sum = 0
 	for i, v in ipairs(data) do
 		sum = sum + math.pow(v - avg, 2)
 	end
 
 	return sum / #data
+end
+
+-- 计算矢量合
+function lso.utils.math.getMag(...)
+	local vec = {...}
+	local sum = 0
+	if (#vec == 0) then
+		return sum
+	end
+	if (type(vec[1]) == "table") then
+		vec = vec[1]
+	end
+	for i, v in pairs(vec) do
+		sum = sum + math.pow(v, 2)
+  end
+	return math.sqrt(sum)
 end
 
 
@@ -282,10 +320,10 @@ end
 -- 返回值 bx, by: 接地点 vec2 坐标
 function  lso.utils.getLandingPoint()
 	local carrierPoint = lso.carrier.unit:getPoint()
-	local carrierHeadding = mist.getHeading(lso.carrier.unit, true)
-	local cx, cy = lso.utils.math.getOffsetPoint(carrierPoint.z, carrierPoint.x, carrierHeadding, lso.carrier.data.offset[1])
-	local bx, by = lso.utils.math.getOffsetPoint(cx, cy ,carrierHeadding + math.pi * 0.5, lso.carrier.data.offset[2])
-	return bx, by
+	local carrierHeadding = math.deg(mist.getHeading(lso.carrier.unit, true))
+	local dir = (carrierHeadding + lso.carrier.data.offset[1]) % 360
+	local x, y = lso.utils.math.getOffsetPoint(carrierPoint.z, carrierPoint.x, dir, lso.carrier.data.offset[2])
+	return x, y
 end
 
 -- 根据距离和高度，计算出当前所处下滑道角度
@@ -296,18 +334,18 @@ function lso.utils.getGlideSlope(distance, altitude)
 	return math.deg(math.atan((altitude - lso.carrier.data.height)/distance))
 end
 
--- 计算当前航向相对于当前着陆甲板朝向的角度偏差
--- bearing: 当前航向
+-- 计算当前进近角相对于当前着陆甲板朝向的角度偏差
+-- angle: 当前进近角
 -- degrees: 是否返回角度值
 -- 返回值: 角度偏差
-function lso.utils.getAngleOffset(bearing, degrees)
-	local carrierHeadding = mist.getHeading(lso.carrier.unit, true)
-	local stdAngle = (carrierHeadding - math.rad(lso.carrier.data.deck) + math.pi) % (math.pi * 2)
-	local offset = lso.utils.math.getInferiorAngle(stdAngle, bearing)
-	if (type(degrees) == "boolean" and degrees) then
-		return math.deg(offset)
-	else
+function lso.utils.getAngleError(angle, degrees)
+	local carrierHeadding = math.deg(mist.getHeading(lso.carrier.unit, true))
+	local stdAngle = (carrierHeadding - lso.carrier.data.deck) % 360
+	local offset = lso.utils.math.getAzimuthError(angle, stdAngle, true)
+	if (degrees) then
 		return offset
+	else
+		return math.rad(offset)
 	end
 end
 
@@ -324,48 +362,34 @@ function lso.utils.getVerticalSpeed(plane)
 	else
 		unit = plane
 	end
-	local unitVel = unit:getVelocity()
-	return unitVel.y
+	return unit:getVelocity().y
 end
 
+-- 获取飞机真空速 m/s
+function lso.utils.getAirSpeed(plane)
+	local unit
+	if (type(plane) == "string") then
+		unit = Unit.getByName(plane)
+	else
+		unit = plane
+	end
+	return lso.utils.math.getMag(unit:getVelocity())
+end
+
+-- 获取飞机地速 m/s
+function lso.utils.getGroundSpeed(plane)
+	local unit
+	if (type(plane) == "string") then
+		unit = Unit.getByName(plane)
+	else
+		unit = plane
+	end
+	local vel = unit:getVelocity()
+	return lso.utils.math.getMag(vel.x, vel.z)
+end
 
 lso.approch = {}
-lso.approch.radio = {}
 lso.approch.tracking = {}
-
-lso.approch.TrackData = {plane, data}
-function lso.approch.TrackData:new(unit)
-		assert(unit ~= nil, "TrackData: unit cannot be nil");
-		local obj = {
-			plane = unit,
-			data = {},
-		}
-		setmetatable(obj, {__index = self})
-		return obj
-end
-function lso.approch.TrackData:addData(flightData)
-		table.insert(self.data, 1, flightData)
-		if (#self.data > 20) then -- 只记录最近20条飞行数据，即 20 * 0.1 = 2秒内数据
-			table.remove(self.data, #self.data)
-		end
-end
-function lso.approch.TrackData:getData()
-	if (#self.data > 0) then
-		return self.data[1]
-	else
-		return nil
-	end
-end
-function lso.approch.TrackData:getDataRecord(dataType)
-	dataType = string.lower(dataType)
-	local data = {}
-	for k, v in ipairs(self.data) do
-		if (v[dataType] ~= nil) then
-			table.insert(data, v[dataType])
-		end
-	end
-	return data
-end
 
 lso.approch.command = {
 	HIGH = lso.RadioCommand:new("approch.HIGH", "LSO: You're high!", nil, 2, lso.RadioCommand.Priority.NORMAL),
@@ -376,6 +400,9 @@ lso.approch.command = {
 	EASY = lso.RadioCommand:new("approch.EASY", "LSO: Easy with it.", nil, 2, lso.RadioCommand.Priority.NORMAL),
 	FAST = lso.RadioCommand:new("approch.FAST", "LSO: You're fast!", nil, 2, lso.RadioCommand.Priority.NORMAL),
 	SLOW = lso.RadioCommand:new("approch.SLOW", "LSO: You're slow!", nil, 2, lso.RadioCommand.Priority.NORMAL),
+
+	WAVE_OFF = lso.RadioCommand:new("approch.WAVE_OFF", "LSO: Wave off! Wave off! Wave off!", nil, 3, lso.RadioCommand.Priority.IMMEDIATELY),
+	BOLTER = lso.RadioCommand:new("approch.BOLTER", "LSO: Bolter! Bolter! Bolter!", nil, 2, lso.RadioCommand.Priority.IMMEDIATELY),
 }
 
 lso.approch.commands = {}
@@ -447,7 +474,9 @@ function lso.approch:dismissCommand(unit, cmd)
 end
 function lso.approch:setCommand(unit, cmd, set)
 	if (set) then
-		self:showCommand(unit, cmd)
+		return self:showCommand(unit, cmd)
+	else
+		return false
 	end
 end
 function lso.approch:clearCommand(unit)
@@ -460,6 +489,50 @@ function lso.approch:clearCommand(unit)
 	self.commands[unitName] = nil
 end
 
+
+lso.approch.TrackData = {plane, data, commands, processTime}
+function lso.approch.TrackData:new(unit)
+		assert(unit ~= nil, "TrackData: unit cannot be nil");
+		local obj = {
+			plane = unit,
+			data = {},
+			commands = {},
+			processTime = {
+				start,middle,close,ramp,
+			},
+		}
+		setmetatable(obj, {__index = self})
+		return obj
+end
+function lso.approch.TrackData:addData(flightData)
+		table.insert(self.data, flightData)
+end
+function lso.approch.TrackData:getData()
+	if (#self.data > 0) then
+		return self.data[#self.data]
+	else
+		return nil
+	end
+end
+function lso.approch.TrackData:getDataRecord(dataType, length)
+	dataType = string.lower(dataType)
+	length = length <= #self.data and length or #self.data
+	local data = {}
+	for i = #self.data, #self.data - length + 1, -1 do
+		if (self.data[i][dataType] ~= nil) then
+			table.insert(data, self.data[i][dataType])
+		end
+	end
+	return data
+end
+function lso.approch.TrackData:addCommand(command, timestamp)
+		table.insert(self.commands, {
+			command = command,
+			timestamp = timestamp or timer.getTime()
+		})
+end
+
+
 function lso.approch:track()
 	local allPlanes = mist.makeUnitTable({"[all][plane]"})
 	local lx, ly = lso.utils.getLandingPoint()
@@ -467,11 +540,11 @@ function lso.approch:track()
 		local plane = Unit.getByName(planeName)
 		if (plane and plane:isActive() and plane:isExist() and plane:getPlayerName() ~= nil) then
 			local planePoint = plane:getPoint()
-			local range = lso.utils.getDistance(planePoint.z, planePoint.x, lx, ly)
-			local bearing = lso.utils.math.getBearing(lx, ly, planePoint.z, planePoint.x)
-			local angleOffset = lso.utils.getAngleOffset(bearing, true)
-			local gs = lso.utils.getGlideSlope(range, planePoint.y)
-		 	track = (range <= 4000 and math.abs(angleOffset) <= 20 and math.abs(gs - lso.carrier.data.gs) < 2)
+			local dist = lso.utils.getDistance(planePoint.z, planePoint.x, lx, ly)
+			local angle = lso.utils.math.getAzimuth(planePoint.z, planePoint.x, lx, ly, true)
+			local angleError = lso.utils.getAngleError(angle, true)
+			local gs = lso.utils.getGlideSlope(dist, planePoint.y)
+		 	track = (dist <= 4000 and math.abs(angleError) <= 20 and math.abs(gs - lso.carrier.data.gs) < 2)
 			if (track) then
 				self:check(plane)
 			end
@@ -495,58 +568,101 @@ function lso.approch:check(unit)
 	local trackData = self.TrackData:new(unit)
 	local trackFrame = function(args, trackTime)
 		local plane = trackData.plane
+		local trackCommand = function (cmd, check)
+			if (self:setCommand(plane, cmd, check)) then
+				trackData:addCommand(cmd, trackTime)
+			end
+		end
 		if (plane and plane:isActive() and plane:isExist() and plane:getPlayerName() ~= nil) then
 			local planePoint = plane:getPoint()
+			local planeHeading = mist.getHeading(plane, true)
 			local lx, ly = lso.utils.getLandingPoint()
-			local range = lso.utils.getDistance(planePoint.z, planePoint.x, lx, ly)
-			local bearing = lso.utils.math.getBearing(lx, ly, planePoint.z, planePoint.x)
-			local angleOffset = lso.utils.getAngleOffset(bearing, true)
-			local gs = lso.utils.getGlideSlope(range, planePoint.y)
+			local angle = lso.utils.math.getAzimuth(planePoint.z, planePoint.x, lx, ly, true)
+			local angleError = lso.utils.getAngleError(angle, true)
+			local dist = lso.utils.getDistance(planePoint.z, planePoint.x, lx, ly)
+			local rtg = dist * math.cos(math.rad(angleError))
+			local gs = lso.utils.getGlideSlope(dist, planePoint.y)
 			local aoa = math.deg(mist.getAoA(plane))
+			local speed = lso.utils.getAirSpeed(plane)
 			local vs = lso.utils.getVerticalSpeed(plane)
+
+			if (rtg < 20) then
+				local previousData = trackData:getData()
+				if (previousData and (previousData.speed - speed) > 6) then
+					-- 着舰完成
+					self.tracking[plane:getName()] = nil
+					return nil
+				elseif (rtg < -80) then -- bolter
+					trackCommand(self.command.BOLTER, true)
+					self.tracking[plane:getName()] = nil
+					return nil
+				end
+				return timer.getTime() + 0.01
+			end
+
 			local flightData = {
-				range = range,
-				bearing = bearing,
-				angle = angleOffset,
+				heading = planeHeading,
+				rtg = rtg, -- range to go
+				angle = angleError,
 				gs = gs,
 				aoa = aoa,
 				atltitude = planePoint.y,
+				speed = speed,
 				vs = vs,
+				timestamp = trackTime,
 			}
-		 	waveOff = (math.abs(angleOffset) > 20 and math.abs(gs - lso.carrier.data.gs) > 2)
-			if (not waveOff) then
-				trackData:addData(flightData)
-			else
-				self:clearCommand(plane)
+			trackData:addData(flightData)
+
+			local vsVariance = lso.utils.math.getVariance(trackData:getDataRecord("vs", 20))
+			local gsDiff = gs - lso.carrier.data.gs
+			local aoaAvg = lso.utils.math.getAverage(trackData:getDataRecord("aoa", 20))
+			local aoaDiff = aoaAvg - aircraft.aoa
+
+		 	local waveOff = (
+				math.abs(angleError) * math.min(1, rtg / 60) > 10
+				or math.abs(gsDiff) * math.min(1, rtg / 160) > 2
+				or (gsDiff < 0 and -gsDiff or 0) > 2
+			)
+			if (waveOff) then
+				trackCommand(self.command.WAVE_OFF, true)
 				self.tracking[plane:getName()] = nil
 				return nil
 			end
 
-			local vsVariance = lso.utils.math.getVariance(trackData:getDataRecord("vs"))
-			local gsDiff = gs - lso.carrier.data.gs
-			local aoaDiff = aoa - aircraft.aoa
 
-			-- local data = string.format("偏移距 %.3f\n方位角 %.3f", range, math.deg(bearing))
-			-- local msg = string.format("标准下滑道 %.3f\n下滑道 %.3f", lso.carrier.data.gs, gs)
-			-- local diff = string.format("偏移角 %.3f\n下滑道偏离 %.3f", angleOffset, gsDiff)
-			-- local aoa = string.format("攻角 %.3f", aoa)
-			-- local vs = string.format("垂直速度 %.3f\n垂速变化 %.3f", vs, vsVariance or 0)
-			-- mist.message.add({
-			-- 	text = plane:getTypeName() .. "\n" .. data .. "\n" .. msg .. "\n" .. diff .. "\n" .. aoa .. "\n" .. vs,
-			-- 	displayTime = 5,
-			-- 	msgFor = {units={plane:getName()}},
-			-- 	name = plane:getName() .. "test",
-			-- })
+			if (trackData.processTime.start == nil and rtg > 800) then
+				trackData.processTime.start = trackTime
+			elseif (trackData.processTime.middle == nil and rtg <= 800 and rtg > 400) then
+				trackData.processTime.middle = trackTime
+			elseif (trackData.processTime.close == nil and rtg <= 400 and rtg > 160) then
+				trackData.processTime.close = trackTime
+			elseif (trackData.processTime.ramp == nil and rtg < 60) then
+				trackData.processTime.ramp = trackTime
+			end
 
-			self:setCommand(plane, self.command.TOO_LOW, (gsDiff < -0.4))
-			self:setCommand(plane, self.command.LOW, (gsDiff < -0.3 and gsDiff >= -0.6))
-			self:setCommand(plane, self.command.HIGH, (gsDiff > 0.6))
-			self:setCommand(plane, self.command.LEFT, (angleOffset > 1.5))
-			self:setCommand(plane, self.command.RIGHT, (angleOffset < -1.5))
-			self:setCommand(plane, self.command.EASY, (vsVariance > 1))
+			local timestamp = string.format("时间 %.3f", trackTime)
+			local data = string.format("偏移距 %.3f\n方位角 %.3f", rtg, angle)
+			local msg = string.format("标准下滑道 %.3f\n下滑道 %.3f", lso.carrier.data.gs, gs)
+			local diff = string.format("偏移角 %.3f\n下滑道偏离 %.3f", angleError, gsDiff)
+			local aoa = string.format("攻角 %.3f", aoa)
+			local vs = string.format("垂直速度 %.3f\n垂速变化 %.3f", vs, vsVariance or 0)
+			local length = string.format("数据数量 %d\n指令数量 %d", #trackData.data, #trackData.commands)
+			mist.message.add({
+				text = plane:getTypeName() .. "\n".. timestamp .. "\n" .. data .. "\n" .. msg .. "\n" .. diff .. "\n" .. aoa .. "\n" .. vs.. "\n" .. length,
+				displayTime = 5,
+				msgFor = {units={plane:getName()}},
+				name = plane:getName() .. "test",
+			})
 
-			self:setCommand(plane, self.command.FAST, (aoaDiff < -1.2))
-			self:setCommand(plane, self.command.SLOW, (aoaDiff > 1.2))
+			trackCommand(self.command.TOO_LOW, (gsDiff < -0.4))
+			trackCommand(self.command.LOW, (gsDiff < -0.3 and gsDiff >= -0.6))
+			trackCommand(self.command.HIGH, (gsDiff > 0.6))
+			trackCommand(self.command.LEFT, (angleError > 1.5))
+			trackCommand(self.command.RIGHT, (angleError < -1.5))
+			trackCommand(self.command.EASY, (vsVariance > 1))
+
+			trackCommand(self.command.FAST, (aoaDiff < -1.2))
+			trackCommand(self.command.SLOW, (aoaDiff > 1.2))
 
 			return timer.getTime() + 0.1
 		else
