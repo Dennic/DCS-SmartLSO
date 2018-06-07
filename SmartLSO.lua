@@ -1146,7 +1146,7 @@ function lso.LSO:track(plane)
 				end
 			elseif (callTheBall == 2) then
 				local fuelMess = lso.Converter.KG_LB(plane.fuel) / 1000 -- 千磅
-				cmd = lso.RadioCommand:new(	"lso.BALL_CALL", plane.unit:getCallsign(), string.format("%s, %s ball, %.1f.", plane.number, plane.model.name, fuelMess), nil, 2, lso.RadioCommand.Priority.NORMAL)
+				cmd = lso.RadioCommand:new(	"lso.BALL_CALL", plane.number, string.format("%s, %s ball, %.1f.", plane.number, plane.model.name, fuelMess), nil, 2, lso.RadioCommand.Priority.NORMAL)
 				if (self:showCommand(cmd, plane.unit)) then
 					callTheBall = 3
 				end
