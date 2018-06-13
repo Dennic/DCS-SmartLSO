@@ -164,6 +164,7 @@ do -- the main scope
 												if env.mission.version > 7 then
 													groupName = env.getValueDictByKey(groupName)
 												end
+												mist.DBs.units[coa_name][countryName][category][group_num].data = group_data
 												mist.DBs.units[coa_name][countryName][category][group_num].groupName = groupName
 												mist.DBs.units[coa_name][countryName][category][group_num].groupId = group_data.groupId
 												mist.DBs.units[coa_name][countryName][category][group_num].category = category
