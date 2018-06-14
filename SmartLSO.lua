@@ -8,15 +8,12 @@ function Enum(...)
 	return enum
 end
 
-
 lso = {}
-lso.logger = mist.Logger:new("LSO", "info") -- 初始化日志记录
-
 
 -- 航母单位名称
 lso.carrierName = "Mother"
 -- 使用真实无线电频率
-lso.useRadioFrequency = false
+lso.useRadioFrequency = true
 -- 航母无线电单位名称
 lso.carrierRadioName = "Mother Radio"
 -- 航母航行区域名称
@@ -60,8 +57,13 @@ lso.data.aircrafts = {
 		aoa = 9,
 	},
 }
+lso.data.coalitions = {
+	[0] = "neutrals",
+	[1] = "red",
+	[2] = "blue",
+}
 function lso.data.getAircraft(unit)
-	if (unit and unit:isExist()) then
+	if (unit) then
 		local typeName = unit:getTypeName()
 		for name, data in pairs(lso.data.aircrafts) do
 			if (name == typeName) then
@@ -105,9 +107,54 @@ function lso.doFrame(arg, frameTime)
 		end
 		i = i + 1
 	end
-	return timer.getTime() + 2
+	return timer.getTime() + 1
 end
 timer.scheduleFunction(lso.doFrame, nil, timer.getTime() + 1)
+
+
+-- 数据库模块
+lso.DB = {}
+-- 飞机集合
+lso.DB.planes = {}
+function lso.DB.init()
+	local coalition = lso.data.coalitions[lso.Carrier.unit:getCoalition()]
+	for coaName, coaData in pairs(env.mission.coalition) do
+		if (coaName == coalition) then
+			if (coaData.country) then
+				for countryID, countryData in pairs(coaData.country) do
+					for categoryName, categoryData in pairs(countryData) do
+						if (categoryName == "plane") then
+							if (categoryData.group and type(categoryData.group) == 'table' and #categoryData.group > 0) then
+								for groupID, groupData in pairs(categoryData.group) do
+									if (groupData.units and type(groupData.units) == 'table' and #groupData.units > 0) then
+										for unitID, unitData in pairs(groupData.units) do
+											if (unitData.skill == "Player" or unitData.skill == "Client") then
+												if (lso.data.aircrafts[unitData.type]) then
+													local unitName
+													if env.mission.version > 7 then
+														unitName = env.getValueDictByKey(unitData.name)
+													else
+														unitName = unitData.name
+													end
+													local aircraftData = lso.data.aircrafts[unitData.type]
+													local onboardNumber = unitData.onboard_num
+													local plane = lso.Plane:new(unitName, aircraftData, onboardNumber)
+													if (plane) then
+														lso.DB.planes[unitName] = plane
+													end
+												end
+											end
+										end
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end
 
 
 -- 航母模块
@@ -262,7 +309,7 @@ function lso.Carrier:addRoute(clearAll)
 	
 	self.nextPoint = nextPoint
 	self.pointCount = self.pointCount + 1
-	trigger.action.markToAll(self.pointCount, string.format("%d", self.pointCount), {x=self.nextPoint.x, y=0, z=self.nextPoint.y})
+	-- trigger.action.markToAll(self.pointCount, string.format("%d", self.pointCount), {x=self.nextPoint.x, y=0, z=self.nextPoint.y})
 	return true
 end
 function lso.Carrier:reachPoint()
@@ -382,37 +429,33 @@ lso.Plane = {
 	gsError, -- 当前下滑道相对标准下滑道误差（角度）
 	aoa, -- 攻角（角度）
 	roll, -- 侧倾角
-	speed, -- 空速（m/s）
+	speed, -- 示空速（m/s）
 	vs, -- 垂直速度（m/s）
 	fuel, -- 剩余油量（kg）
 }
-function lso.Plane:new(unit)
+function lso.Plane:new(unit, aircraftData, onboardNumber)
 	local unitObj, unitName
 	if (type(unit) == "string") then
 		unitObj = Unit.getByName(unit)
+		if not unitObj then
+			return nil
+		end
 		unitName = unit
 	else
 		unitObj = unit
-		unitName = unit:getName()
-	end
-	local number = mist.DBs.unitsByName[unitName].onboard_num
-	local aircraft = lso.data.getAircraft(unitObj)
-	if (not aircraft) then
-		return nil
-	else
-		local obj = {
-			unit = unitObj,
-			name = unitName,
-			model = aircraft,
-			number = number
-		}
-		setmetatable(obj, {__index = self, __eq = self.equalTo, __tostring = self.toString})
-		if (obj:updateData()) then
-			return obj
-		else
+		if not unitObj then
 			return nil
 		end
+		unitName = unit:getName()
 	end
+	local obj = {
+		unit = unitObj,
+		name = unitName,
+		model = aircraftData,
+		number = onboardNumber
+	}
+	setmetatable(obj, {__index = self, __eq = self.equalTo, __tostring = self.toString})
+	return obj
 end
 function lso.Plane:updateData()
 	if (self.unit and self.unit:isExist()) then
@@ -429,7 +472,7 @@ function lso.Plane:updateData()
 		self.gsError = self.gs - lso.Carrier.data.gs
 		self.aoa = math.deg(mist.getAoA(self.unit) or 0)
 		self.roll = math.deg(mist.getRoll(self.unit) or 0)
-		self.speed = lso.utils.getAirSpeed(self.unit)
+		self.speed = lso.utils.getIndicatedAirSpeed(self.unit)
 		self.vs = lso.utils.getVerticalSpeed(self.unit)
 		local fuelMassMax = self.unit:getDesc().fuelMassMax -- 总油重 千克
 		self.fuel = fuelMassMax * self.unit:getFuel()
@@ -454,6 +497,17 @@ function lso.Plane.equalTo(self, another)
 end
 function lso.Plane.toString(self)
 	return self.unit:getName()
+end
+function lso.Plane.get(unitName)
+	if (type(unitName) == "table") then
+		unitName = unitName:getName()
+	end
+	local plane = lso.DB.planes[unitName]
+	if (plane and plane:updateData()) then
+		return plane
+	else
+		return nil
+	end
 end
 
 
@@ -615,39 +669,45 @@ function lso.utils.getDistance(x1, y1, x2, y2)
 end
 
 -- 获取飞机垂直速度 m/s
-function lso.utils.getVerticalSpeed(plane)
-	local unit
-	if (type(plane) == "string") then
-		unit = Unit.getByName(plane)
-	else
-		unit = plane
+function lso.utils.getVerticalSpeed(unit)
+	if (type(unit) == "string") then
+		unit = Unit.getByName(unit)
 	end
 	return unit:getVelocity().y
 end
 
--- 获取飞机真空速 m/s
-function lso.utils.getAirSpeed(plane)
-	local unit
-	if (type(plane) == "string") then
-		unit = Unit.getByName(plane)
-	else
-		unit = plane
+-- 获取单位真空速 m/s
+function lso.utils.getAirSpeed(unit)
+	if (type(unit) == "string") then
+		unit = Unit.getByName(unit)
 	end
 	return lso.utils.math.getMag(unit:getVelocity()) or 0
 end
 
--- 获取飞机地速 m/s
-function lso.utils.getGroundSpeed(plane)
-	local unit
-	if (type(plane) == "string") then
-		unit = Unit.getByName(plane)
-	else
-		unit = plane
+-- 获取单位地速 m/s
+function lso.utils.getGroundSpeed(unit)
+	if (type(unit) == "string") then
+		unit = Unit.getByName(unit)
 	end
 	local vel = unit:getVelocity()
 	return lso.utils.math.getMag(vel.x, vel.z) or 0
 end
 
+-- 获取单位示空速 m/s
+function lso.utils.getIndicatedAirSpeed(unit)
+	if (type(unit) == "string") then
+		unit = Unit.getByName(unit)
+	end
+	local tas = lso.utils.getAirSpeed(unit)
+	local point = unit:getPoint()
+	local t, p = atmosphere.getTemperatureAndPressure(point)
+	local t0 = 288.15
+	point.y = 0
+	local tsl, p0 = atmosphere.getTemperatureAndPressure(point)
+	-- EAS = √((TAS^2)/(p0/p)/(T/T0))
+	local eas = math.sqrt(math.pow(tas, 2) / (p0/p) / (t/t0))
+	return eas
+end
 
 -- 数学计算工具模块
 lso.utils.math ={}
@@ -908,8 +968,8 @@ function lso.menu.handler.checkIn(unit)
 		return
 	end
 	if (lso.process.getStatus(unit) == lso.process.Status.NONE) then
-		local plane = lso.Plane:new(unit)
-		if plane and plane:updateData() then
+		local plane = lso.Plane.get(unit)
+		if (plane) then
 			local fuelMess = lso.Converter.KG_LB(plane.fuel) / 1000 -- 千磅
 			local angel = mist.utils.round(lso.Converter.M_FT(plane.autitude) / 1000) -- 千英尺
 			local distance = mist.utils.round(lso.Converter.M_NM(plane.distance)) -- 海里
@@ -927,8 +987,8 @@ function lso.menu.handler.inSight(unit)
 		return
 	end
 	if (lso.process.getStatus(unit) == lso.process.Status.CHECK_IN) then
-		local plane = lso.Plane:new(unit)
-		if plane and plane:updateData() then
+		local plane = lso.Plane.get(unit)
+		if (plane) then
 			local distance = mist.utils.round(lso.Converter.M_NM(plane.distance)) -- 海里
 			
 			lso.RadioCommand:new(string.format("%s.see_you", plane.number), plane.number, string.format("Marshal, %s, See you at %d.", plane.number, distance), nil, 2, lso.RadioCommand.Priority.NORMAL)
@@ -943,8 +1003,8 @@ function lso.menu.handler.information(unit)
 	if (not lso.menu.hasMenu(unit, lso.menu.Command.INFO)) then
 		return
 	end
-	local plane = lso.Plane:new(unit)
-	if plane and plane:updateData() then
+	local plane = lso.Plane.get(unit)
+	if (plane) then
 		lso.Marshal:offerInformation()
 	end
 end
@@ -952,8 +1012,8 @@ function lso.menu.handler.depart(unit)
 	if (not lso.menu.hasMenu(unit, lso.menu.Command.DEPART)) then
 		return
 	end
-	local plane = lso.Plane:new(unit)
-	if plane and plane:updateData() then
+	local plane = lso.Plane.get(unit)
+	if (plane) then
 		local status = lso.process.getStatus(unit)
 		if (
 			status == lso.process.Status.INITIAL
@@ -973,8 +1033,8 @@ function lso.menu.handler.abort(unit)
 	if (not lso.menu.hasMenu(unit, lso.menu.Command.ABORT)) then
 		return
 	end
-	local plane = lso.Plane:new(unit)
-	if plane and plane:updateData() then
+	local plane = lso.Plane.get(unit)
+	if (plane) then
 		lso.process.changeStatus(unit, lso.process.Status.NONE)
 		lso.menu.removeMenu(unit, lso.menu.Command.INFO)
 		lso.menu.removeMenu(unit, lso.menu.Command.IN_SIGHT)
@@ -1039,8 +1099,8 @@ function lso.Marshal:onFrame()
 	if (timer.getTime() > self.coolDownTime and lso.LSO.contact ~= true) then
 		if (#self.visual > 0) then
 			for i, unitName in pairs(self.visual) do
-				local plane = lso.Plane:new(unitName)
-				if (lso.process.getStatus(plane.unit) == lso.process.Status.CHECK_IN and plane) then
+				local plane = lso.Plane.get(unitName)
+				if (plane and lso.process.getStatus(plane.unit) == lso.process.Status.CHECK_IN) then
 					lso.RadioCommand:new(string.format("%s.switch_tower", plane.name), "Marshal", string.format("%s, Switch Tower.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
 						:onFinish(function()
 							lso.RadioCommand:new(string.format("%s.switch_tower_roger", plane.name), plane.number, string.format("%s, Roger, Switch Tower.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
@@ -1059,7 +1119,7 @@ function lso.Marshal:onFrame()
 			end
 		elseif (#self.check > 0) then
 			for i, unitName in pairs(self.check) do
-				local plane = lso.Plane:new(unitName)
+				local plane = lso.Plane.get(unitName)
 				if (plane) then
 					local temperature, pressure = lso.Carrier:getTemperatureAndPressure()
 					local replyMsg, rogerMsg
@@ -1146,7 +1206,7 @@ function lso.Tower:onFrame()
 	-- })
 	if (timer.getTime() > self.coolDownTime and lso.LSO.contact ~= true) then
 		for i, unitName in pairs(self.monitoring) do
-			local plane = lso.Plane:new(unitName)
+			local plane = lso.Plane.get(unitName)
 			if (plane) then
 				local status = lso.process.getStatus(plane.unit)
 				-- if (lso.Carrier.turning) then
@@ -1191,14 +1251,14 @@ function lso.Tower:onFrame()
 					local carrierHeadding = lso.Carrier:getHeadding(true)
 					if (status == lso.process.Status.IN_SIGHT) then
 						if (not lso.Carrier.turning) then
-							-- 在航母的相对方位 170-190° 之间
-							if (plane.azimuth > 170 and plane.azimuth < 190) then
+							-- 在航母的相对方位 160-200° 之间
+							if (plane.azimuth > 160 and plane.azimuth < 200) then
 								-- 距离 1-3 nm
 								if (lso.Converter.M_NM(plane.distance) > 1 and lso.Converter.M_NM(plane.distance) < 3) then
-									-- 高度低于 1300 ft，速度小于 380 节 
-									if (lso.Converter.M_FT(plane.autitude) < 1300 and lso.Converter.MS_KNOT(plane.speed) < 380) then
-										-- 航向为航母航向 ±10°
-										if (math.abs(lso.utils.math.getAzimuthError(plane.heading, carrierHeadding, true)) < 10) then
+									-- 高度低于 1300 ft，速度小于 400 节 
+									if (lso.Converter.M_FT(plane.autitude) < 1300 and lso.Converter.MS_KNOT(plane.speed) < 400) then
+										-- 航向为航母航向 ±20°
+										if (math.abs(lso.utils.math.getAzimuthError(plane.heading, carrierHeadding, true)) < 20) then
 											lso.RadioCommand:new(string.format("%s.initial", plane.name), plane.number, string.format("%s, Initial.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
 												:onFinish(function()
 													lso.RadioCommand:new(string.format("%s.initial_reply", plane.name), "Tower", string.format("Roger, %s.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
@@ -1210,14 +1270,24 @@ function lso.Tower:onFrame()
 											lso.menu.addMenu(plane.unit, lso.menu.Command.DEPART, lso.menu.handler.depart)
 										end
 									end
+								elseif (lso.Converter.M_NM(plane.distance) < 1 and lso.Converter.M_FT(plane.autitude) < 1200) then
+									lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
 								end
+							else
+								if (lso.Converter.M_NM(plane.distance) < 2 and lso.Converter.M_FT(plane.autitude) < 1200) then
+									lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
+								end
+							end
+						else
+							if (lso.Converter.M_NM(plane.distance) < 2 and lso.Converter.M_FT(plane.autitude) < 1200) then
+								lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
 							end
 						end
 					elseif (status == lso.process.Status.INITIAL) then
 						-- 在航母的相对方位 270-360° 之间
 						if (plane.azimuth > 270 and plane.azimuth < 360) then
-							-- 高度低于 1000 ft，速度小于 380 节 
-							if (lso.Converter.M_FT(plane.autitude) < 1000 and lso.Converter.MS_KNOT(plane.speed) < 380) then
+							-- 高度低于 1000 ft，速度小于 400 节 
+							if (lso.Converter.M_FT(plane.autitude) < 1000 and lso.Converter.MS_KNOT(plane.speed) < 400) then
 								-- 航向为航母航向向左大于8度
 								if (lso.utils.math.getAzimuthError(plane.heading, carrierHeadding, true) < -8) then
 									lso.RadioCommand:new(string.format("%s.break", plane.name), plane.number, string.format("%s, Breaking.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
@@ -1661,13 +1731,20 @@ function lso:onFrame()
 	local allPlanes = coalition.getPlayers(lso.Carrier.unit:getCoalition())
 	local lx, ly = lso.Carrier:getLandingPoint()
 	for i, unit in ipairs(allPlanes) do
-		local plane = lso.Plane:new(unit)
+		local plane = lso.Plane.get(unit)
 		if plane and plane:updateData() then
+			local point = unit:getPoint()
+			local t, p = atmosphere.getTemperatureAndPressure(point)
 			mist.message.add({
-				text =  string.format("倾角 %.3f", plane.roll),
+				text =  string.format("气压\n%.3f\n%.3f\n真空速 %.3f\n示空速 %.3f", 
+					(p / 100),
+					lso.Converter.PA_INHG(p),
+					lso.Converter.MS_KNOT(plane.speed),
+					lso.Converter.MS_KNOT(lso.utils.getIndicatedAirSpeed(plane.unit))
+				),
 				displayTime = 2,
-				msgFor = {coa = {"all"}},
-				name = "roll",
+				msgFor = {units={plane.unit:getName()}},
+				name = plane.name .. "data",
 			})
 		end
 	end
@@ -1714,9 +1791,9 @@ function lso.eventHandler:onEvent(event)
         end
 		return true
     end, event)
-    -- if (not status) then
-        -- lso.logger:error("Error while handling event")
-    -- end
+    if (not status) then
+        env.error("Error while handling event")
+    end
 end
 
 
@@ -1727,7 +1804,7 @@ function lso.init()
 		error("Carrier not ready.")
 		-- error(carrier.unit, string.format("Carrier not ready. unsupported carrier type <%s>.", typeName))
 	end
-	
+	lso.DB.init() -- 初始化数据库
 	-- lso.mainProcess = lso.addCheckFrame(lso) -- 添加主检测帧程序
 	lso.Carrier.frameID = lso.addCheckFrame(lso.Carrier) -- 添加航母检测帧程序
 	lso.Marshal.frameID = lso.addCheckFrame(lso.Marshal) -- 添加 Marshal 检测帧程序
@@ -1735,14 +1812,10 @@ function lso.init()
 
 	world.addEventHandler(lso.eventHandler)
 	
-	
 	-- 遍历初始化所有飞机状态
-	local allPlanes = coalition.getPlayers(lso.Carrier.unit:getCoalition())
-	local lx, ly = lso.Carrier:getLandingPoint()
-	for i, unit in ipairs(allPlanes) do
-		local plane = lso.Plane:new(unit)
-		if plane and plane:updateData() then
-			lso.process.initPlane(unit)
+	for unitName, plane in pairs(lso.DB.planes) do
+		if (plane:updateData()) then
+			lso.process.initPlane(plane.unit)
 		end
 	end
 end
