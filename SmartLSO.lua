@@ -13,7 +13,7 @@ lso = {}
 -- 航母单位名称
 lso.carrierName = "Mother"
 -- 使用真实无线电频率
-lso.useRadioFrequency = true
+lso.useRadioFrequency = false
 -- 航母无线电单位名称
 lso.carrierRadioName = "Mother Radio"
 -- 航母航行区域名称
