@@ -13,13 +13,13 @@ lso = {}
 -- 航母单位名称
 lso.carrierName = "Mother"
 -- 使用真实无线电频率
-lso.useRadioFrequency = false
+lso.useRadioFrequency = true
 -- 航母无线电单位名称
 lso.carrierRadioName = "Mother Radio"
+-- 航母AI航行模式 0-无  1-区域内随机  2-自动
+lso.carrierSailing = 1
 -- 航母航行区域名称
 lso.carrierSailArea = "Sail Area"
--- 航母随机航行
-lso.carrierSailing = true
 -- 航母航行速度（节）
 lso.carrierSpeed = 25
 
@@ -107,7 +107,7 @@ function lso.doFrame(arg, frameTime)
 		end
 		i = i + 1
 	end
-	return timer.getTime() + 1
+	return timer.getTime() + 2
 end
 timer.scheduleFunction(lso.doFrame, nil, timer.getTime() + 1)
 
@@ -123,7 +123,25 @@ function lso.DB.init()
 			if (coaData.country) then
 				for countryID, countryData in pairs(coaData.country) do
 					for categoryName, categoryData in pairs(countryData) do
-						if (categoryName == "plane") then
+						if (categoryName == "ship") then
+							if (categoryData.group and type(categoryData.group) == 'table' and #categoryData.group > 0) then
+								for groupID, groupData in pairs(categoryData.group) do
+									if (groupData.units and type(groupData.units) == 'table' and #groupData.units > 0) then
+										for unitID, unitData in pairs(groupData.units) do
+											local unitName
+											if env.mission.version > 7 then
+												unitName = env.getValueDictByKey(unitData.name)
+											else
+												unitName = unitData.name
+											end
+											if (unitName == lso.Carrier.unit:getName()) then
+												lso.Carrier:loadTasks(groupData)
+											end
+										end
+									end
+								end
+							end
+						elseif (categoryName == "plane") then
 							if (categoryData.group and type(categoryData.group) == 'table' and #categoryData.group > 0) then
 								for groupID, groupData in pairs(categoryData.group) do
 									if (groupData.units and type(groupData.units) == 'table' and #groupData.units > 0) then
@@ -189,43 +207,41 @@ function lso.Carrier:init()
 			end
 		end
 		if (self.data ~= nil) then
-			if (lso.carrierSailing) then
-				self:loadTasks()
-				-- self:addRoute()
-				self.needToTurn = true
-			end
 			return true
 		end
 	end
 	return false
 end
-function lso.Carrier:loadTasks()
-	local group = self.unit:getGroup()
-	if group then
-		local groupCon = group:getController()
-		if groupCon then
-			local route = mist.DBs.groupsByName[group:getName()].data.route
-			if (#route.points > 1) then
-				route.points = {route.points[1]}
-			end
-			local tasks = mist.DBs.groupsByName[group:getName()].data.tasks
-			groupCon:setTask({
-				id = 'Mission',
-				params = {
-					route = route
-				},
-			})
-			for i, task in pairs(tasks) do
-				if (task.id == "WrappedAction") then
-					local action = task.params.action
-					if (action.id == "Option") then
-						groupCon:setOption(action.params.name, action.params.value)
-					else
-						groupCon:setCommand(action)
+function lso.Carrier:loadTasks(groupData)
+	if (lso.carrierSailing == 1 or lso.carrierSailing == 2) then
+		local group = self.unit:getGroup()
+		if group then
+			local groupCon = group:getController()
+			if groupCon then
+				local route = groupData.route
+				if (#route.points > 1) then
+					route.points = {route.points[1]}
+				end
+				local tasks = groupData.tasks
+				groupCon:setTask({
+					id = 'Mission',
+					params = {
+						route = route
+					},
+				})
+				for i, task in pairs(tasks) do
+					if (task.id == "WrappedAction") then
+						local action = task.params.action
+						if (action.id == "Option") then
+							groupCon:setOption(action.params.name, action.params.value)
+						else
+							groupCon:setCommand(action)
+						end
 					end
 				end
 			end
 		end
+		self.needToTurn = true
 	end
 end
 function lso.Carrier:addRoute(clearAll)
@@ -241,7 +257,7 @@ function lso.Carrier:addRoute(clearAll)
 	end
 	local tried = 0
 	repeat
-		local point = mist.getRandPointInCircle(center, radius)
+		local point = lso.utils.getRandPointInCircle(center, radius)
 		local dist = lso.utils.getDistance(point.x, point.y, self.nextPoint.x, self.nextPoint.y)
 		local dx = point.x - self.nextPoint.x
 		local dy = point.y - self.nextPoint.y
@@ -320,7 +336,7 @@ function lso.Carrier:getBRC(current)
 		return lso.Carrier:getHeadding(true) or 0
 	else
 		local cPoint = self.unit:getPoint()
-		local nextBRC = mist.utils.round(lso.utils.math.getAzimuth(cPoint.z, cPoint.x, lso.Carrier.nextPoint.y, lso.Carrier.nextPoint.x, true))
+		local nextBRC = lso.math.round(lso.math.getAzimuth(cPoint.z, cPoint.x, lso.Carrier.nextPoint.y, lso.Carrier.nextPoint.x, true))
 		return nextBRC
 	end
 end
@@ -336,7 +352,7 @@ function  lso.Carrier:getLandingPoint()
 	local carrierPoint = self.unit:getPoint()
 	local carrierHeadding = lso.Carrier:getHeadding(true)
 	local dir = (carrierHeadding + self.data.offset[1]) % 360
-	local x, y = lso.utils.math.getOffsetPoint(carrierPoint.z, carrierPoint.x, dir, lso.Carrier.data.offset[2])
+	local x, y = lso.math.getOffsetPoint(carrierPoint.z, carrierPoint.x, dir, lso.Carrier.data.offset[2])
 	return x, y
 end
 -- 根据距离和高度，计算出当前所处下滑道角度
@@ -350,7 +366,7 @@ end
 -- degrees: 是否返回角度值
 -- 返回值: 航母航向
 function lso.Carrier:getHeadding(degrees)
-	return math.deg(mist.getHeading(self.unit, degrees) or 0)
+	return math.deg(lso.utils.getHeading(self.unit, degrees) or 0)
 end
 -- 计算当前进近角相对于当前着陆甲板朝向的角度偏差
 -- angle: 当前进近角
@@ -359,7 +375,7 @@ end
 function lso.Carrier:getAngleError(angle, degrees)
 	local carrierHeadding = lso.Carrier:getHeadding(true)
 	local stdAngle = (carrierHeadding - self.data.deck) % 360
-	local offset = lso.utils.math.getAzimuthError(angle, stdAngle, true)
+	local offset = lso.math.getAzimuthError(angle, stdAngle, true)
 	if (degrees) then
 		return offset
 	else
@@ -384,7 +400,7 @@ function lso.Carrier:onFrame()
 	
 	-- 检测航母是否在转向
 	local heading = lso.Carrier:getHeadding(true)
-	if (self.lastHeadding and math.abs(lso.utils.math.getAzimuthError(heading, self.lastHeadding, true)) > 0.1) then
+	if (self.lastHeadding and math.abs(lso.math.getAzimuthError(heading, self.lastHeadding, true)) > 0.1) then
 	-- if (self.lastHeadding and heading ~= self.lastHeadding) then
 		if (not self.turning) then
 			self.turningTime = timer.getTime()
@@ -418,7 +434,7 @@ lso.Plane = {
 	model, -- 飞机型号
 	number, -- 机身编号
 	point, -- 飞机位置
-	autitude, -- 飞机高度（米）
+	altitude, -- 飞机高度（米）
 	heading, -- 飞机航向（角度）
 	azimuth, -- 飞机位于航母的方位角（角度）
 	angle, -- 飞机到着陆点角度（角度）
@@ -460,18 +476,18 @@ end
 function lso.Plane:updateData()
 	if (self.unit and self.unit:isExist()) then
 		self.point = self.unit:getPoint()
-		self.autitude = self.point.y
-		self.heading = math.deg(mist.getHeading(self.unit, true) or 0)
+		self.altitude = self.point.y
+		self.heading = math.deg(lso.utils.getHeading(self.unit, true) or 0)
 		local lx, ly = lso.Carrier:getLandingPoint()
-		self.angle = lso.utils.math.getAzimuth(self.point.z, self.point.x, lx, ly, true)
+		self.angle = lso.math.getAzimuth(self.point.z, self.point.x, lx, ly, true)
 		self.angleError = lso.Carrier:getAngleError(self.angle, true)
 		self.azimuth = (self.angle + 180 - lso.Carrier:getHeadding(true)) % 360
 		self.distance = lso.utils.getDistance(self.point.z, self.point.x, lx, ly)
 		self.rtg = self.distance * math.cos(math.rad(self.angleError))
 		self.gs = lso.Carrier:getGlideSlope(self.distance, self.point.y)
 		self.gsError = self.gs - lso.Carrier.data.gs
-		self.aoa = math.deg(mist.getAoA(self.unit) or 0)
-		self.roll = math.deg(mist.getRoll(self.unit) or 0)
+		self.aoa = math.deg(lso.utils.getAoA(self.unit) or 0)
+		self.roll = math.deg(lso.utils.getRoll(self.unit) or 0)
 		self.speed = lso.utils.getIndicatedAirSpeed(self.unit)
 		self.vs = lso.utils.getVerticalSpeed(self.unit)
 		local fuelMassMax = self.unit:getDesc().fuelMassMax -- 总油重 千克
@@ -636,6 +652,24 @@ lso.Converter = {
 -- 工具模块
 lso.utils = {}
 
+function lso.utils.deepCopy(object)
+	local lookup_table = {}
+	local function _copy(object)
+		if type(object) ~= "table" then
+			return object
+		elseif lookup_table[object] then
+			return lookup_table[object]
+		end
+		local new_table = {}
+		lookup_table[object] = new_table
+		for index, value in pairs(object) do
+			new_table[_copy(index)] = _copy(value)
+		end
+		return setmetatable(new_table, getmetatable(object))
+	end
+	return _copy(object)
+end
+
 function lso.utils.tableSize(t)
 	local count = 0
 	for k, v in pairs(t) do
@@ -668,7 +702,111 @@ function lso.utils.getDistance(x1, y1, x2, y2)
 	return math.sqrt(math.pow(x1 - x2, 2) + math.pow(y1 - y2, 2))
 end
 
--- 获取飞机垂直速度 m/s
+function lso.utils.getWindInfo(point)
+	local wind = atmosphere.getWind(point)
+	
+	local heading = math.atan2(wind.z, wind.x)
+	heading = heading + lso.utils.getNorthCorrection(point)
+	if heading < 0 then
+		heading = heading + 2*math.pi
+	end
+	
+	local speed = lso.math.getMag(wind) or 0
+	return heading, speed
+end
+
+-- 获取单位航向 MIST
+function lso.utils.getHeading(unit, rawHeading)
+	local unitpos = unit:getPosition()
+	if unitpos then
+		local Heading = math.atan2(unitpos.x.z, unitpos.x.x)
+		if not rawHeading then
+			Heading = Heading + lso.utils.getNorthCorrection(unitpos.p)
+		end
+		if Heading < 0 then
+			Heading = Heading + 2*math.pi	-- put heading in range of 0 to 2*pi
+		end
+		return Heading
+	end
+end
+
+-- 获取单位攻角 MIST
+function lso.utils.getAoA(unit)
+	local unitpos = unit:getPosition()
+	if unitpos then
+		local unitvel = unit:getVelocity()
+		if lso.math.getMag(unitvel) ~= 0 then --must have non-zero velocity!
+			local AxialVel = {}	--unit velocity transformed into aircraft axes directions
+			--transform velocity components in direction of aircraft axes.
+			AxialVel.x = lso.math.getDP(unitpos.x, unitvel)
+			AxialVel.y = lso.math.getDP(unitpos.y, unitvel)
+			AxialVel.z = lso.math.getDP(unitpos.z, unitvel)
+			-- AoA is angle between unitpos.x and the x and y velocities
+			local AoA = math.acos(lso.math.getDP({x = 1, y = 0, z = 0}, {x = AxialVel.x, y = AxialVel.y, z = 0})/lso.math.getMag({x = AxialVel.x, y = AxialVel.y, z = 0}))
+			--now set correct direction:
+			if AxialVel.y > 0 then
+				AoA = -AoA
+			end
+			return AoA
+		end
+	end
+end
+
+-- 获取单位俯仰角 MIST
+function lso.utils.getPitch(unit)
+	local unitpos = unit:getPosition()
+	if unitpos then
+		return math.asin(unitpos.x.y)
+	end
+end
+
+-- 获取单位侧倾角 MIST
+function lso.utils.getRoll(unit)
+	local unitpos = unit:getPosition()
+	if unitpos then
+		-- now get roll:
+		--maybe not the best way to do it, but it works.
+		--first, make a vector that is perpendicular to y and unitpos.x with cross product
+		local cp = lso.math.getCP(unitpos.x, {x = 0, y = 1, z = 0})
+		--now, get dot product of of this cross product with unitpos.z
+		local dp = lso.math.getDP(cp, unitpos.z)
+		--now get the magnitude of the roll (magnitude of the angle between two vectors is acos(vec1.vec2/|vec1||vec2|)
+		local Roll = math.acos(dp/(lso.math.getMag(cp)*lso.math.getMag(unitpos.z)))
+		--now, have to get sign of roll.
+		-- by convention, making right roll positive
+		-- to get sign of roll, use the y component of unitpos.z.	For right roll, y component is negative.
+		if unitpos.z.y > 0 then -- left roll, flip the sign of the roll
+			Roll = -Roll
+		end
+		return Roll
+	end
+end
+
+-- 获取单位偏航角 MIST
+function lso.utils.getYaw(unit)
+	local unitpos = unit:getPosition()
+	if unitpos then
+		-- get unit velocity
+		local unitvel = unit:getVelocity()
+		if lso.math.getMag(unitvel) ~= 0 then --must have non-zero velocity!
+			local AxialVel = {}	--unit velocity transformed into aircraft axes directions
+			--transform velocity components in direction of aircraft axes.
+			AxialVel.x = lso.math.getDP(unitpos.x, unitvel)
+			AxialVel.y = lso.math.getDP(unitpos.y, unitvel)
+			AxialVel.z = lso.math.getDP(unitpos.z, unitvel)
+			--Yaw is the angle between unitpos.x and the x and z velocities
+			--define right yaw as positive
+			local Yaw = math.acos(lso.math.getDP({x = 1, y = 0, z = 0}, {x = AxialVel.x, y = 0, z = AxialVel.z})/lso.math.getMag({x = AxialVel.x, y = 0, z = AxialVel.z}))
+			--now set correct direction:
+			if AxialVel.z > 0 then
+				Yaw = -Yaw
+			end
+			return Yaw
+		end
+	end
+end
+
+-- 获取单位垂直速度 m/s
 function lso.utils.getVerticalSpeed(unit)
 	if (type(unit) == "string") then
 		unit = Unit.getByName(unit)
@@ -681,7 +819,7 @@ function lso.utils.getAirSpeed(unit)
 	if (type(unit) == "string") then
 		unit = Unit.getByName(unit)
 	end
-	return lso.utils.math.getMag(unit:getVelocity()) or 0
+	return lso.math.getMag(unit:getVelocity()) or 0
 end
 
 -- 获取单位地速 m/s
@@ -690,7 +828,7 @@ function lso.utils.getGroundSpeed(unit)
 		unit = Unit.getByName(unit)
 	end
 	local vel = unit:getVelocity()
-	return lso.utils.math.getMag(vel.x, vel.z) or 0
+	return lso.math.getMag(vel.x, vel.z) or 0
 end
 
 -- 获取单位示空速 m/s
@@ -701,7 +839,7 @@ function lso.utils.getIndicatedAirSpeed(unit)
 	local tas = lso.utils.getAirSpeed(unit)
 	local point = unit:getPoint()
 	local t, p = atmosphere.getTemperatureAndPressure(point)
-	local t0 = 288.15
+	local t0 = 288.15 -- 15℃标准气温（开尔文）
 	point.y = 0
 	local tsl, p0 = atmosphere.getTemperatureAndPressure(point)
 	-- EAS = √((TAS^2)/(p0/p)/(T/T0))
@@ -709,10 +847,68 @@ function lso.utils.getIndicatedAirSpeed(unit)
 	return eas
 end
 
--- 数学计算工具模块
-lso.utils.math ={}
+-- 获取单位气压高度 m （实验）
+function lso.utils.getBaroAltitude(unit)
+	if (type(unit) == "string") then
+		unit = Unit.getByName(unit)
+	end
+	local point = unit:getPoint()
+	local t, p = atmosphere.getTemperatureAndPressure(point)
+	point.y = 0
+	local t0, p0 = atmosphere.getTemperatureAndPressure(point)
+	local alt = (1 - math.pow(p/p0, 1/5.256)) / 0.00002257
+	return alt
+end
 
-function lso.utils.math.dirToAngle(direction, degrees)
+-- 获取圈中随机点 MIST
+function lso.utils.getRandPointInCircle(point, radius, innerRadius)
+	local theta = 2*math.pi*math.random()
+	local rad = math.random() + math.random()
+	if rad > 1 then
+		rad = 2 - rad
+	end
+
+	local radMult
+	if innerRadius and innerRadius <= radius then
+		radMult = (radius - innerRadius)*rad + innerRadius
+	else
+		radMult = radius*rad
+	end
+
+	if not point.z then --might as well work with vec2/3
+		point.z = point.y
+	end
+
+	local rndCoord
+	if radius > 0 then
+		rndCoord = {x = math.cos(theta)*radMult + point.x, y = math.sin(theta)*radMult + point.z}
+	else
+		rndCoord = {x = point.x, y = point.z}
+	end
+	return rndCoord
+end
+
+-- 获取指定坐标点的北修正量
+function lso.utils.getNorthCorrection(gPoint)	--gets the correction needed for true north
+	local point = lso.utils.deepCopy(gPoint)
+	if not point.z then --Vec2; convert to Vec3
+		point.z = point.y
+		point.y = 0
+	end
+	local lat, lon = coord.LOtoLL(point)
+	local north_posit = coord.LLtoLO(lat + 1, lon)
+	return math.atan2(north_posit.z - point.z, north_posit.x - point.x)
+end
+
+-- 数学计算工具模块
+lso.math ={}
+
+function lso.math.round(num, idp)
+	local mult = 10^(idp or 0)
+	return math.floor(num * mult + 0.5) / mult
+end
+
+function lso.math.dirToAngle(direction, degrees)
 	local dir
 	if (degrees) then
 		dir = direction
@@ -732,7 +928,7 @@ function lso.utils.math.dirToAngle(direction, degrees)
 		return math.rad(angle)
 	end
 end
-function lso.utils.math.angleToDir(angle, degrees)
+function lso.math.angleToDir(angle, degrees)
 	local agl
 	if (degrees) then
 		agl = angle
@@ -753,8 +949,8 @@ function lso.utils.math.angleToDir(angle, degrees)
 	end
 end
 
-function lso.utils.math.getOffsetPoint(x, y, dir, dist)
-	local angle = math.rad(lso.utils.math.dirToAngle(dir, true))
+function lso.math.getOffsetPoint(x, y, dir, dist)
+	local angle = math.rad(lso.math.dirToAngle(dir, true))
 	local dx = math.cos(angle) * dist
 	local dy = math.sin(angle) * dist
 	return x + dx, y + dy
@@ -766,15 +962,15 @@ end
 -- xs,ys:基准点坐标
 -- xt,yt:目标点坐标
 -- degrees:布尔值，是否返回角度（默认返回弧度）
-function  lso.utils.math.getAzimuth(xs, ys, xt, yt, degrees)
+function  lso.math.getAzimuth(xs, ys, xt, yt, degrees)
 	local dx = xt - xs
 	local dy = yt - ys
 
 	if (dx == 0) then
 		return 0
 	else
-		local deg = lso.utils.math.angleToDir(math.atan(dy/dx))
-		deg = (deg + mist.getNorthCorrection({x=xs, y=ys})) % 360
+		local deg = lso.math.angleToDir(math.atan(dy/dx))
+		deg = (deg + lso.utils.getNorthCorrection({x=xs, y=ys})) % 360
 		if (xt < xs) then
 			deg = deg + math.pi
 		end
@@ -786,7 +982,7 @@ function  lso.utils.math.getAzimuth(xs, ys, xt, yt, degrees)
 	end
 end
 
-function lso.utils.math.getAzimuthError(a1, a2, degrees)
+function lso.math.getAzimuthError(a1, a2, degrees)
 	local diff
 	if (degrees) then
 		diff = a1 - a2
@@ -809,7 +1005,7 @@ end
 -- 计算平均值
 -- 计算一组数据的平均值
 -- data:数据 table
-function lso.utils.math.getAverage(data)
+function lso.math.getAverage(data)
 	if (#data == 0) then
 		return 0
 	end
@@ -824,11 +1020,11 @@ end
 -- 计算方差
 -- 计算一组数据的方差
 -- data:数据 table
-function lso.utils.math.getVariance(data)
+function lso.math.getVariance(data)
 	if (#data < 2) then
 		return 0
 	end
-	local avg = lso.utils.math.getAverage(data)
+	local avg = lso.math.getAverage(data)
 	local sum = 0
 	for i, v in ipairs(data) do
 		sum = sum + math.pow(v - avg, 2)
@@ -837,8 +1033,8 @@ function lso.utils.math.getVariance(data)
 	return sum / #data
 end
 
--- 计算矢量合
-function lso.utils.math.getMag(...)
+-- 计算向量合
+function lso.math.getMag(...)
 	local vec = {...}
 	local sum = 0
 	if (#vec == 0) then
@@ -853,6 +1049,15 @@ function lso.utils.math.getMag(...)
 	return math.sqrt(sum)
 end
 
+-- 计算向量点积
+function lso.math.getDP(vec1, vec2)
+	return vec1.x*vec2.x + vec1.y*vec2.y + vec1.z*vec2.z
+end
+
+-- 计算向量交叉乘积
+function lso.math.getCP(vec1, vec2)
+	return { x = vec1.y*vec2.z - vec1.z*vec2.y, y = vec1.z*vec2.x - vec1.x*vec2.z, z = vec1.x*vec2.y - vec1.y*vec2.x}
+end
 
 
 lso.process = {}
@@ -971,8 +1176,8 @@ function lso.menu.handler.checkIn(unit)
 		local plane = lso.Plane.get(unit)
 		if (plane) then
 			local fuelMess = lso.Converter.KG_LB(plane.fuel) / 1000 -- 千磅
-			local angel = mist.utils.round(lso.Converter.M_FT(plane.autitude) / 1000) -- 千英尺
-			local distance = mist.utils.round(lso.Converter.M_NM(plane.distance)) -- 海里
+			local angel = lso.math.round(lso.Converter.M_FT(plane.altitude) / 1000) -- 千英尺
+			local distance = lso.math.round(lso.Converter.M_NM(plane.distance)) -- 海里
 			
 			lso.RadioCommand:new(string.format("%s.check_in", plane.number), plane.number, string.format("Marshal, %s, %03d for %d, Angels %d, State %.1f.", plane.number, (plane.angle + 180) % 360, distance, angel, fuelMess), nil, 4, lso.RadioCommand.Priority.NORMAL)
 				:onFinish(function()
@@ -989,7 +1194,7 @@ function lso.menu.handler.inSight(unit)
 	if (lso.process.getStatus(unit) == lso.process.Status.CHECK_IN) then
 		local plane = lso.Plane.get(unit)
 		if (plane) then
-			local distance = mist.utils.round(lso.Converter.M_NM(plane.distance)) -- 海里
+			local distance = lso.math.round(lso.Converter.M_NM(plane.distance)) -- 海里
 			
 			lso.RadioCommand:new(string.format("%s.see_you", plane.number), plane.number, string.format("Marshal, %s, See you at %d.", plane.number, distance), nil, 2, lso.RadioCommand.Priority.NORMAL)
 				:onFinish(function()
@@ -1238,7 +1443,7 @@ function lso.Tower:onFrame()
 						break
 					end
 					if (
-						lso.Converter.M_FT(plane.autitude) > 1200
+						lso.Converter.M_FT(plane.altitude) > 1200
 						or lso.Converter.MS_KNOT(plane.speed) > 400
 						or lso.Converter.M_NM(plane.distance) > 4
 					) then
@@ -1256,9 +1461,9 @@ function lso.Tower:onFrame()
 								-- 距离 1-3 nm
 								if (lso.Converter.M_NM(plane.distance) > 1 and lso.Converter.M_NM(plane.distance) < 3) then
 									-- 高度低于 1300 ft，速度小于 400 节 
-									if (lso.Converter.M_FT(plane.autitude) < 1300 and lso.Converter.MS_KNOT(plane.speed) < 400) then
+									if (lso.Converter.M_FT(plane.altitude) < 1300 and lso.Converter.MS_KNOT(plane.speed) < 400) then
 										-- 航向为航母航向 ±20°
-										if (math.abs(lso.utils.math.getAzimuthError(plane.heading, carrierHeadding, true)) < 20) then
+										if (math.abs(lso.math.getAzimuthError(plane.heading, carrierHeadding, true)) < 20) then
 											lso.RadioCommand:new(string.format("%s.initial", plane.name), plane.number, string.format("%s, Initial.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
 												:onFinish(function()
 													lso.RadioCommand:new(string.format("%s.initial_reply", plane.name), "Tower", string.format("Roger, %s.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
@@ -1270,16 +1475,16 @@ function lso.Tower:onFrame()
 											lso.menu.addMenu(plane.unit, lso.menu.Command.DEPART, lso.menu.handler.depart)
 										end
 									end
-								elseif (lso.Converter.M_NM(plane.distance) < 1 and lso.Converter.M_FT(plane.autitude) < 1200) then
+								elseif (lso.Converter.M_NM(plane.distance) < 1 and lso.Converter.M_FT(plane.altitude) < 1200) then
 									lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
 								end
 							else
-								if (lso.Converter.M_NM(plane.distance) < 2 and lso.Converter.M_FT(plane.autitude) < 1200) then
+								if (lso.Converter.M_NM(plane.distance) < 2 and lso.Converter.M_FT(plane.altitude) < 1200) then
 									lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
 								end
 							end
 						else
-							if (lso.Converter.M_NM(plane.distance) < 2 and lso.Converter.M_FT(plane.autitude) < 1200) then
+							if (lso.Converter.M_NM(plane.distance) < 2 and lso.Converter.M_FT(plane.altitude) < 1200) then
 								lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
 							end
 						end
@@ -1287,25 +1492,28 @@ function lso.Tower:onFrame()
 						-- 在航母的相对方位 270-360° 之间
 						if (plane.azimuth > 270 and plane.azimuth < 360) then
 							-- 高度低于 1000 ft，速度小于 400 节 
-							if (lso.Converter.M_FT(plane.autitude) < 1000 and lso.Converter.MS_KNOT(plane.speed) < 400) then
-								-- 航向为航母航向向左大于8度
-								if (lso.utils.math.getAzimuthError(plane.heading, carrierHeadding, true) < -8) then
-									lso.RadioCommand:new(string.format("%s.break", plane.name), plane.number, string.format("%s, Breaking.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
-										:onFinish(function()
-											lso.RadioCommand:new(string.format("%s.break_reply", plane.name), "Tower", string.format("%s, Dirty up.", plane.number), nil, 3, lso.RadioCommand.Priority.NORMAL)
-												:send(lso.Carrier.radio)
-										end)
-										:send(plane.unit)
-									self.coolDownTime = timer.getTime() + 5
-									lso.process.changeStatus(plane.unit, lso.process.Status.BREAK)
+							if (lso.Converter.M_FT(plane.altitude) < 1000 and lso.Converter.MS_KNOT(plane.speed) < 400) then
+								-- 航向为航母航向向左大于5度
+								if (lso.math.getAzimuthError(plane.heading, carrierHeadding, true) < -5) then
+									-- 飞机侧倾角向左大于15度
+									if (plane.roll < -15) then
+										lso.RadioCommand:new(string.format("%s.break", plane.name), plane.number, string.format("%s, Breaking.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
+											:onFinish(function()
+												lso.RadioCommand:new(string.format("%s.break_reply", plane.name), "Tower", string.format("%s, Dirty up.", plane.number), nil, 3, lso.RadioCommand.Priority.NORMAL)
+													:send(lso.Carrier.radio)
+											end)
+											:send(plane.unit)
+										self.coolDownTime = timer.getTime() + 5
+										lso.process.changeStatus(plane.unit, lso.process.Status.BREAK)
+									end
 								end
 							end
 						end
 						if (
-							lso.Converter.M_FT(plane.autitude) > 1300
+							lso.Converter.M_FT(plane.altitude) > 1300
 							or lso.Converter.MS_KNOT(plane.speed) > 450
 							or lso.Converter.M_NM(plane.distance) > 3
-							or math.abs(lso.utils.math.getAzimuthError(plane.heading, carrierHeadding, true)) > 90
+							or math.abs(lso.math.getAzimuthError(plane.heading, carrierHeadding, true)) > 90
 						) then
 							lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
 						end
@@ -1465,7 +1673,7 @@ function lso.LSO:checkContact(plane)
 	-- local data1 = string.format("飞机航向 %.3f\n飞机速度 %.3f", plane.heading, lso.Converter.MS_KNOT(plane.speed))
 	-- local data2 = string.format("船航向 %.3f\n船尾 %.3f\n倾斜甲板 %.3f", carrierHeadding, carrierTail, deckAngle)
 	-- local data3 = string.format("距离 %.3f\n方位角 %.3f", plane.distance, plane.azimuth)
-	-- local data4 = string.format("相对船尾角度 %.3f\n高度 %.3f", lso.utils.math.getAzimuthError(plane.heading, carrierTail, true), plane.autitude)
+	-- local data4 = string.format("相对船尾角度 %.3f\n高度 %.3f", lso.math.getAzimuthError(plane.heading, carrierTail, true), plane.altitude)
 	-- mist.message.add({
 		-- text = data1 .. "\n" .. data2 .. "\n" .. data3 .. "\n" .. data4,
 		-- displayTime = 5,
@@ -1478,9 +1686,9 @@ function lso.LSO:checkContact(plane)
 		-- 距离 0.2-1.7 nm
 		if (lso.Converter.M_NM(plane.distance) > 0.2 and lso.Converter.M_NM(plane.distance) < 1.7) then
 			-- 高度低于 800 ft，速度小于 220 节 
-			if (lso.Converter.M_FT(plane.autitude) < 800 and lso.Converter.MS_KNOT(plane.speed) < 220) then
+			if (lso.Converter.M_FT(plane.altitude) < 800 and lso.Converter.MS_KNOT(plane.speed) < 220) then
 				-- 航向为航母舰尾 ±45°
-				if (math.abs(lso.utils.math.getAzimuthError(plane.heading, carrierTail, true)) < 45) then
+				if (math.abs(lso.math.getAzimuthError(plane.heading, carrierTail, true)) < 45) then
 					-- 改变状态 Paddles Contact
 					lso.process.changeStatus(plane.unit, lso.process.Status.PADDLES)
 					lso.menu.removeMenu(plane.unit, lso.menu.Command.ABORT)
@@ -1494,9 +1702,9 @@ function lso.LSO:checkContact(plane)
 							if (
 								plane.azimuth > 90 and plane.azimuth < 270 -- 在航母后半圆
 								and lso.Converter.M_NM(plane.distance) < 2 -- 距离小于 2.5 nm
-								and lso.Converter.M_FT(plane.autitude) < 800 -- 高度低于 800 ft
+								and lso.Converter.M_FT(plane.altitude) < 800 -- 高度低于 800 ft
 							) then
-								-- local data1 = string.format("方位偏差 %.3f\n角度偏差 %.3f", plane.angleError, lso.utils.math.getAzimuthError(plane.heading, deckAngle, true))
+								-- local data1 = string.format("方位偏差 %.3f\n角度偏差 %.3f", plane.angleError, lso.math.getAzimuthError(plane.heading, deckAngle, true))
 								-- local data2 = string.format("距离下滑道 %.3f", math.sin(math.rad(math.abs(plane.angleError))) * plane.distance)
 								-- mist.message.add({
 									-- text = data1 .. "\n" .. data2,
@@ -1505,19 +1713,19 @@ function lso.LSO:checkContact(plane)
 									-- name = plane.unit:getName() .. "paddles_contact",
 								-- })
 								
-								if (lso.Converter.M_FT(plane.autitude) < 200) then
+								if (lso.Converter.M_FT(plane.altitude) < 200) then
 									self:showCommand(self.command.TOO_LOW)
 								end
 								if (
 									plane.angleError > 0
 									and math.sin(math.rad(plane.angleError)) * plane.distance < 650 -- 到下滑道垂足距离
-									and math.abs(lso.utils.math.getAzimuthError(plane.heading, deckAngle, true)) > 90
+									and math.abs(lso.math.getAzimuthError(plane.heading, deckAngle, true)) > 90
 								)then
 									-- Keep your turn in
 									self:showCommand(self.command.KEEP_TURN)
 								end
 								if (
-									math.abs(lso.utils.math.getAzimuthError(plane.heading, deckAngle, true)) < 15
+									math.abs(lso.math.getAzimuthError(plane.heading, deckAngle, true)) < 15
 									or math.abs(plane.angleError) < 8
 									-- and plane.gsError < 2.5 and plane.gsError > -1
 								) then
@@ -1625,9 +1833,9 @@ function lso.LSO:track(plane)
 			})
 			
 			-- 计算历史飞行数据
-			local rollVariance = lso.utils.math.getVariance(trackData:getDataRecord("roll", 20))
-			local vsVariance = lso.utils.math.getVariance(trackData:getDataRecord("vs", 20))
-			local aoaAvg = lso.utils.math.getAverage(trackData:getDataRecord("aoa", 20))
+			local rollVariance = lso.math.getVariance(trackData:getDataRecord("roll", 20))
+			local vsVariance = lso.math.getVariance(trackData:getDataRecord("vs", 20))
+			local aoaAvg = lso.math.getAverage(trackData:getDataRecord("aoa", 20))
 			local aoaDiff = aoaAvg - plane.model.aoa
 			
 			-- 近距离时将角度误差转换为距离误差，以消除快速发散
@@ -1735,12 +1943,16 @@ function lso:onFrame()
 		if plane and plane:updateData() then
 			local point = unit:getPoint()
 			local t, p = atmosphere.getTemperatureAndPressure(point)
+			local wh, ws = lso.utils.getWindInfo(point)
 			mist.message.add({
-				text =  string.format("气压\n%.3f\n%.3f\n真空速 %.3f\n示空速 %.3f", 
+				text =  string.format("风向 %.3f\n风速 %.3f\n气压\n%.3f\n%.3f\n真空速 %.3f\n示空速 %.3f\n气压高 %.3f", 
+					math.deg(wh),
+					lso.Converter.MS_KNOT(ws),
 					(p / 100),
 					lso.Converter.PA_INHG(p),
 					lso.Converter.MS_KNOT(plane.speed),
-					lso.Converter.MS_KNOT(lso.utils.getIndicatedAirSpeed(plane.unit))
+					lso.Converter.MS_KNOT(lso.utils.getIndicatedAirSpeed(plane.unit)),
+					lso.Converter.M_FT(lso.utils.getBaroAltitude(unit))
 				),
 				displayTime = 2,
 				msgFor = {units={plane.unit:getName()}},
@@ -1805,7 +2017,7 @@ function lso.init()
 		-- error(carrier.unit, string.format("Carrier not ready. unsupported carrier type <%s>.", typeName))
 	end
 	lso.DB.init() -- 初始化数据库
-	-- lso.mainProcess = lso.addCheckFrame(lso) -- 添加主检测帧程序
+	lso.mainProcess = lso.addCheckFrame(lso) -- 添加主检测帧程序
 	lso.Carrier.frameID = lso.addCheckFrame(lso.Carrier) -- 添加航母检测帧程序
 	lso.Marshal.frameID = lso.addCheckFrame(lso.Marshal) -- 添加 Marshal 检测帧程序
 	lso.Tower.frameID = lso.addCheckFrame(lso.Tower) -- 添加 Tower 检测帧程序
