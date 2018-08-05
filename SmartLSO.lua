@@ -716,25 +716,27 @@ function lso.Plane:new(unitName, aircraftData, onboardNumber)
 end
 function lso.Plane:updateData()
 	if (self.unit and self.unit:isExist()) then
-		self.point = self.unit:getPoint()
-		self.altitude = self.point.y
-		self.heading = math.deg(lso.utils.getHeading(self.unit, true) or 0)
-		local lx, ly = lso.Carrier:getLandingPoint()
-		self.angle = lso.math.getAzimuth(self.point.z, self.point.x, lx, ly, true)
-		self.angleError = lso.Carrier:getAngleError(self.angle, true)
-		self.azimuth = (self.angle + 180 - lso.Carrier:getHeadding(true)) % 360
-		self.distance = lso.utils.getDistance(self.point.z, self.point.x, lx, ly)
-		self.rtg = self.distance * math.cos(math.rad(self.angleError))
-		self.gs = lso.Carrier:getGlideSlope(self.distance, self.point.y)
-		self.gsError = self.gs - lso.Carrier.data.gs
-		self.aoa = math.deg(lso.utils.getAoA(self.unit) or 0)
-		self.roll = math.deg(lso.utils.getRoll(self.unit) or 0)
-		self.speed = lso.utils.getIndicatedAirSpeed(self.unit)
-		self.groundSpeed = lso.utils.getGroundSpeed(self.unit)
-		self.vs = lso.utils.getVerticalSpeed(self.unit)
-		local fuelMassMax = self.unit:getDesc().fuelMassMax -- 总油重 千克
-		self.fuel = fuelMassMax * self.unit:getFuel()
-		return true
+		local status, err = pcall(function()
+			self.point = self.unit:getPoint()
+			self.altitude = self.point.y
+			self.heading = math.deg(lso.utils.getHeading(self.unit, true) or 0)
+			local lx, ly = lso.Carrier:getLandingPoint()
+			self.angle = lso.math.getAzimuth(self.point.z, self.point.x, lx, ly, true)
+			self.angleError = lso.Carrier:getAngleError(self.angle, true)
+			self.azimuth = (self.angle + 180 - lso.Carrier:getHeadding(true)) % 360
+			self.distance = lso.utils.getDistance(self.point.z, self.point.x, lx, ly)
+			self.rtg = self.distance * math.cos(math.rad(self.angleError))
+			self.gs = lso.Carrier:getGlideSlope(self.distance, self.point.y)
+			self.gsError = self.gs - lso.Carrier.data.gs
+			self.aoa = math.deg(lso.utils.getAoA(self.unit) or 0)
+			self.roll = math.deg(lso.utils.getRoll(self.unit) or 0)
+			self.speed = lso.utils.getIndicatedAirSpeed(self.unit)
+			self.groundSpeed = lso.utils.getGroundSpeed(self.unit)
+			self.vs = lso.utils.getVerticalSpeed(self.unit)
+			local fuelMassMax = self.unit:getDesc().fuelMassMax -- 总油重 千克
+			self.fuel = fuelMassMax * self.unit:getFuel()
+		end)
+		return status
 	else
 		return false
 	end
@@ -2454,14 +2456,14 @@ function lso.LSO:track(plane)
 			end
 			
 			-- 近距离时将角度误差转换为距离误差，以消除快速发散
-			local angleError = plane.angleError * math.min(1, plane.rtg / 120)
-			local gsError = plane.gsError * math.min(1, plane.rtg / 120)
+			local angleError = plane.angleError * math.min(1, plane.rtg / 160)
+			local gsError = plane.gsError * math.min(1, plane.rtg / 160)
 
 			-- 判断是否需要复飞
-		 	local waveOff = (plane.rtg > 30 and plane.rtg <= 800 and (
-				math.abs(angleError) > 6
+		 	local waveOff = (plane.rtg > 60 and plane.rtg <= 900 and (
+				math.abs(angleError) > 3
 				or gsError > 2 or gsError < -1
-				or (plane.rtg < 300 and gsError < -0.8)
+				or (plane.rtg < 400 and gsError < -0.8)
 			))
 			if (waveOff) then
 				trackCommand(self.command.WAVE_OFF, true, trackTime)
@@ -2520,21 +2522,25 @@ function lso.LSO:track(plane)
 				end
 			end
 			
-			if callTheBall < 1 then
+			-- lso.log(mist.utils.tableShow(trackData:getData()).."\ngsErrorFix: "..gsError.."\nangleErrorFix: "..angleError, 5, true, "trackData")
+			
+			if (callTheBall < 1) then
 
 				-- 根据飞行数据下达指令
 				-- 遵循“先爬升后加速，先减速后下高”原则
 				trackCommand(self.command.TOO_LOW, 		(gsError < -0.6), 						trackTime)
 				trackCommand(self.command.LOW, 			(gsError < -0.2 and gsError >= -0.6), 	trackTime)
-				trackCommand(self.command.SLOW, 		(aoaError == 1), 						trackTime)
-				
-				trackCommand(self.command.LEFT, 		(angleError > 1.5), 					trackTime)
-				trackCommand(self.command.RIGHT, 		(angleError < -1.5), 					trackTime)
-				
-				trackCommand(self.command.FAST, 		(aoaError == -1), 						trackTime)
-				trackCommand(self.command.HIGH, 		(gsError > 1.2), 							trackTime)
-				
-				trackCommand(self.command.EASY, 		(vsVariance > 1 or rollVariance > 100), trackTime)
+				if (plane.rtg > 120) then
+					trackCommand(self.command.SLOW, 		(aoaError == 1), 						trackTime)
+					
+					trackCommand(self.command.LEFT, 		(angleError > 1.8), 					trackTime)
+					trackCommand(self.command.RIGHT, 		(angleError < -1.8), 					trackTime)
+					
+					trackCommand(self.command.FAST, 		(aoaError == -1), 						trackTime)
+					trackCommand(self.command.HIGH, 		(gsError > 1.4), 							trackTime)
+					
+					trackCommand(self.command.EASY, 		(vsVariance > 1 or rollVariance > 100), trackTime)
+				end
 				
 			end
 
@@ -2608,14 +2614,14 @@ function lso.LSO:grade(obj, wire)
 			grade = 2
 		end
 		for i, data in ipairs(trackData.data) do
-			local angleError = data.angle * math.min(1, data.rtg / 120)
-			local gsError = data.gsError * math.min(1, data.rtg / 120)
+			local angleError = data.angle * math.min(1, data.rtg / 160)
+			local gsError = data.gsError * math.min(1, data.rtg / 160)
 			if (
 				(trackData.processTime.ball == nil or data.timestamp > trackData.processTime.ball)
 				and (trackData.processTime.ramp == nil or data.timestamp < trackData.processTime.ramp)
 			) then
 				if (
-					math.abs(angleError) > 3
+					math.abs(angleError) > 2.2
 					or gsError > 1.6
 					or gsError < -0.8
 				) then
@@ -2627,7 +2633,7 @@ function lso.LSO:grade(obj, wire)
 				end
 			end
 			if (data.rtg > 800) then
-				if (math.abs(angleError) > 8 or gsError > 1.6 or gsError < -0.8) then
+				if (math.abs(angleError) > 3 or gsError > 1.6 or gsError < -0.8) then
 					grade = 3
 					-- lso.log("rtg", 8, true)
 					-- lso.log(mist.utils.tableShow(trackData.processTime), 8, true)
