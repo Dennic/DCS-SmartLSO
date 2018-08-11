@@ -15,6 +15,7 @@ end
 lso = {}
 
 lso.debug = false
+
 -- 航母单位名称
 lso.carrierName = "Mother"
 -- 使用真实无线电频率
@@ -369,7 +370,8 @@ function lso.Carrier:init()
 		self:emergency(event)
 	end)
 	local unit = Unit.getByName(lso.carrierName)
-	local radio = Unit.getByName(lso.useRadioFrequency and lso.carrierRadioName or lso.carrierName)
+	local radioUnit = lso.carrierRadioName and Unit.getByName(lso.carrierRadioName) or nil
+	local radio = (lso.useRadioFrequency and radioUnit) and radioUnit or unit
 	if (
 		unit ~= nil and radio ~= nil
 		and unit:isExist() and radio:isExist()
@@ -518,7 +520,7 @@ function lso.Carrier:addRoute(clearAll)
 	self.nextPoint = nextPoint
 	self.pointCount = self.pointCount + 1
 	lso.Broadcast:send(lso.Broadcast.event.TURNING_START)
-	trigger.action.markToAll(self.pointCount, string.format("%d", self.pointCount), {x=self.nextPoint.x, y=0, z=self.nextPoint.y})
+	-- trigger.action.markToAll(self.pointCount, string.format("%d", self.pointCount), {x=self.nextPoint.x, y=0, z=self.nextPoint.y})
 	return true
 end
 function lso.Carrier:reachPoint()
@@ -699,6 +701,7 @@ lso.Plane = {__class="Plane",
 	groundSpeed, -- 地速 (m/s)
 	vs, -- 垂直速度（m/s）
 	fuel, -- 剩余油量（kg）
+	fuelLow, -- 油量告竭
 }
 function lso.Plane:new(unitName, aircraftData, onboardNumber)
 	if (unitName == nil) then
@@ -709,7 +712,8 @@ function lso.Plane:new(unitName, aircraftData, onboardNumber)
 		unit = unit,
 		name = unitName,
 		model = aircraftData,
-		number = onboardNumber
+		number = onboardNumber,
+		fuelLow = false
 	}
 	setmetatable(obj, {__index = self, __eq = self.equalTo, __tostring = self.toString})
 	return obj
@@ -727,7 +731,7 @@ function lso.Plane:updateData()
 			self.distance = lso.utils.getDistance(self.point.z, self.point.x, lx, ly)
 			self.rtg = self.distance * math.cos(math.rad(self.angleError))
 			self.gs = lso.Carrier:getGlideSlope(self.distance, self.point.y)
-			self.gsError = self.gs - lso.Carrier.data.gs
+			self.gsError = self.gs - (lso.Carrier.data.gs - lso.utils.getPitch(lso.Carrier.unit))
 			self.aoa = math.deg(lso.utils.getAoA(self.unit) or 0)
 			self.roll = math.deg(lso.utils.getRoll(self.unit) or 0)
 			self.speed = lso.utils.getIndicatedAirSpeed(self.unit)
@@ -779,7 +783,7 @@ end
 
 -- RadioCommand 类
 -- 创建和发送无线电指令
-lso.RadioCommand = {__class="RadioCommand", id, tag, speaker, msg, sound, duration, priority, callback}
+lso.RadioCommand = {__class="RadioCommand", id, sent, tag, speaker, msg, sound, duration, priority, callback}
 lso.RadioCommand.count = 0
 lso.RadioCommand.Priority = Enum(
 	"LOW",
@@ -792,6 +796,7 @@ function lso.RadioCommand:new(tag, speaker, msg, sound, duration, priority, unit
 	self.count = self.count + 1
 	local obj = {
 		id = self.count,
+		sent = false,
 		tag = tag or ("RadioCommand"..self.count),
 		speaker = speaker,
 		msg = msg,
@@ -849,6 +854,7 @@ function lso.RadioCommand:send(unit, data)
 	local content = self.msg:format(unpack(data or {}))
 	local msg = string.format("%s: %s", self.speaker, content)
 	if (unit and unit:isExist()) then
+		self.sent = true
 		if (lso.useRadioFrequency) then
 			local controller = unit:getController()
 			if (controller) then
@@ -876,13 +882,14 @@ end
 
 -- RadioCommandGroup 类
 -- 创建和发送无线电指令组
-lso.RadioCommandGroup = {__class="RadioCommandGroup", id, msgQueue, callback, sendTask}
+lso.RadioCommandGroup = {__class="RadioCommandGroup", id, sent, msgQueue, callback, sendTask}
 lso.RadioCommandGroup.count = 0
 function lso.RadioCommandGroup:new(msgQueue)
 	msgQueue = type(msgQueue) == "table" and msgQueue or {}
 	self.count = self.count + 1
 	local obj = {
 		id = self.count,
+		sent = false,
 		msgQueue = msgQueue,
 	}
 	setmetatable(obj, {__index = self, __eq = self.equalTo, __add=self.concat, __concat=self.concat})
@@ -946,6 +953,7 @@ function lso.RadioCommandGroup:send()
 		end
 	end
 	self.sendTask = timer.scheduleFunction(sendQueue, nil, timer.getTime() + 0.01)
+	self.sent = true
 end
 
 
@@ -1384,20 +1392,24 @@ end
 function  lso.math.getAzimuth(xs, ys, xt, yt, degrees)
 	local dx = xt - xs
 	local dy = yt - ys
-
+	local azimuth
 	if (dx == 0) then
-		return 0
-	else
-		local deg = lso.math.angleToDir(math.atan(dy/dx))
-		deg = (deg + lso.utils.getNorthCorrection({x=xs, y=ys})) % 360
-		if (xt < xs) then
-			deg = deg + math.pi
-		end
-		if (degrees) then
-			return math.deg(deg)
+		if (dy >= 0) then
+			azimuth = 0
 		else
-			return deg
+			azimuth = math.pi
 		end
+	else
+		azimuth = lso.math.angleToDir(math.atan(dy/dx))
+		if (xt < xs) then
+			azimuth = azimuth + math.pi
+		end
+	end
+	azimuth = (azimuth + lso.utils.getNorthCorrection({x=xs, y=ys})) % (2 * math.pi)
+	if (degrees) then
+		return math.deg(azimuth)
+	else
+		return azimuth
 	end
 end
 
@@ -1499,6 +1511,7 @@ end
 function lso.process.initPlane(unit)
 	local plane = lso.Plane.get(unit)
 	if plane then
+		plane.fuelLow = false
 		lso.Carrier:removePlane(plane)
 	end
 	lso.process.changeStatus(unit, lso.process.Status.NONE)
@@ -1906,10 +1919,11 @@ function lso.Marshal:process()
 			local units = lso.process.getUnitsInStatus({lso.process.Status.CHECK_IN, lso.process.Status.IN_SIGHT})
 			for i, unit in ipairs(units) do
 				local plane = lso.Plane.get(unit)
-				if plane then
+				if (plane and plane.fuelLow == false) then
 					local fuelMess = lso.Converter.KG_LB(plane.fuel) / 1000
 					-- 燃油小于 1500 磅
 					if (fuelMess < self.lowFuel) then
+						plane.fuelLow = true
 						self.lowFuel = lso.math.random(1, 2, true)
 						table.insert(self.queue, function(timestamp)
 							local radio = lso.RadioCommand:new(string.format("saystate_%s", plane.name), "Marshal", string.format("%s, Say state.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
@@ -2010,8 +2024,8 @@ function lso.Tower:onFrame()
 							if (not lso.Carrier.turning) then
 								-- 在航母的相对方位 160-200° 之间
 								if (plane.azimuth > 160 and plane.azimuth < 200) then
-									-- 距离 1-3 nm
-									if (lso.Converter.M_NM(plane.distance) > 1 and lso.Converter.M_NM(plane.distance) < 3) then
+									-- 距离 0.5-3 nm
+									if (lso.Converter.M_NM(plane.distance) > 0.5 and lso.Converter.M_NM(plane.distance) < 3) then
 										-- 高度低于 1300 ft，速度小于 400 节 
 										if (lso.Converter.M_FT(plane.altitude) < 1300 and lso.Converter.MS_KNOT(plane.speed) < 400) then
 											-- 航向为航母航向 ±20°
@@ -2261,7 +2275,6 @@ function lso.LSO:checkContact(plane)
 	end
 	local carrierHeadding = lso.Carrier:getHeadding(true)
 	local carrierTail = (carrierHeadding + 180) % 360
-	local deckAngle = (carrierHeadding - lso.Carrier.data.deck) % 360
 	
 	-- local data1 = string.format("飞机航向 %.3f\n飞机速度 %.3f", plane.heading, lso.Converter.MS_KNOT(plane.speed))
 	-- local data2 = string.format("船航向 %.3f\n船尾 %.3f\n倾斜甲板 %.3f", carrierHeadding, carrierTail, deckAngle)
@@ -2288,9 +2301,11 @@ function lso.LSO:checkContact(plane)
 					
 					self.command.CONTACT:send(lso.Carrier.radio, {plane.number})
 					
+					local keepTurn = false
 					local paddleFrame = function(args, timestamp)
 						local carrierHeadding = lso.Carrier:getHeadding(true)
 						local carrierTail = (carrierHeadding + 180) % 360
+						local deckAngle = (carrierHeadding - lso.Carrier.data.deck) % 360
 						if (plane:updateData()) then -- 更新飞行数据
 							if (
 								plane.azimuth > (180 - lso.Carrier.data.deck - 15) and plane.azimuth < 275 -- 在航母后半圆
@@ -2312,12 +2327,18 @@ function lso.LSO:checkContact(plane)
 								if (
 									plane.angleError > 0
 									and math.sin(math.rad(plane.angleError)) * plane.distance < 650 -- 到下滑道垂足距离
-									and math.abs(lso.math.getAzimuthError(plane.heading, deckAngle, true)) > 70
+									and math.abs(lso.math.getAzimuthError(plane.heading, deckAngle, true)) > 75
 								)then
 									-- Keep your turn in
-									self:showCommand(self.command.KEEP_TURN)
+									if (keepTurn == false and self:showCommand(self.command.KEEP_TURN)) then
+										keepTurn = true
+									end
 								end
-								if (math.abs(lso.math.getAzimuthError(plane.heading, deckAngle, true)) < 15) then
+								local carrierPoint = lso.Carrier.unit:getPoint()
+								if (
+									math.abs(lso.math.getAzimuthError(plane.heading, lso.math.getAzimuth(plane.point.z, plane.point.x, carrierPoint.z, carrierPoint.x, true))) < 10
+									or math.abs(plane.angleError) < 5
+								) then
 									if (math.abs(plane.angleError) < 5) then
 										if (self:track(plane)) then
 											return nil
@@ -2461,7 +2482,7 @@ function lso.LSO:track(plane)
 
 			-- 判断是否需要复飞
 		 	local waveOff = (plane.rtg > 60 and plane.rtg <= 900 and (
-				math.abs(angleError) > 3
+				math.abs(angleError) > 5
 				or gsError > 2 or gsError < -1
 				or (plane.rtg < 400 and gsError < -0.8)
 			))
@@ -2537,7 +2558,7 @@ function lso.LSO:track(plane)
 					trackCommand(self.command.RIGHT, 		(angleError < -1.8), 					trackTime)
 					
 					trackCommand(self.command.FAST, 		(aoaError == -1), 						trackTime)
-					trackCommand(self.command.HIGH, 		(gsError > 1.4), 							trackTime)
+					trackCommand(self.command.HIGH, 		(gsError > 1.2), 							trackTime)
 					
 					trackCommand(self.command.EASY, 		(vsVariance > 1 or rollVariance > 100), trackTime)
 				end
