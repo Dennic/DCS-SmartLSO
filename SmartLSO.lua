@@ -78,7 +78,7 @@ lso.data.carriers = {
 lso.data.aircrafts = {
 	["FA-18C_hornet"] = {
 		name = "hornet",
-		aoa = 8,
+		aoa = 8.1,
 	},
 	["Su-33"] = {
 		name = "falcon",
@@ -2126,6 +2126,7 @@ lso.LSO.command = {
 	EASY 		= 	lso.RadioCommand:new("lso.EASY", 			"LSO", "Easy with it.", 				lso.Sound.LSO.EASY				, 2, lso.RadioCommand.Priority.NORMAL),
 	FAST 		= 	lso.RadioCommand:new("lso.FAST", 			"LSO", "You're fast!", 					lso.Sound.LSO.FAST				, 2, lso.RadioCommand.Priority.NORMAL),
 	SLOW 		= 	lso.RadioCommand:new("lso.SLOW", 			"LSO", "You're slow!", 					lso.Sound.LSO.SLOW				, 2, lso.RadioCommand.Priority.NORMAL),
+	SETTLE 		= 	lso.RadioCommand:new("lso.SETTLE", 			"LSO", "Don't settle!", 				nil								, 2, lso.RadioCommand.Priority.HIGH),
 
 	FOUL_DECK	= 	lso.RadioCommand:new("lso.FOUL_DECK",		"LSO", "Wave off, Foul deck.", 			lso.Sound.LSO.WAVEOFF			, 3, lso.RadioCommand.Priority.IMMEDIATELY),
 	WAVE_OFF	= 	lso.RadioCommand:new("lso.WAVE_OFF",		"LSO", "Wave off! Wave off!", 			lso.Sound.LSO.WAVEOFF			, 3, lso.RadioCommand.Priority.IMMEDIATELY),
@@ -2213,18 +2214,18 @@ function lso.LSO.TrackData:track(timestamp)
 	local plane = self.plane
 	-- 记录新的飞行数据
 	local flightData = {
-		heading = plane.heading,
-		distance = plane.distance,
-		rtg = plane.rtg, -- range to go
-		angle = plane.angleError,
-		gs = plane.gs,
-		gsError = plane.gsError,
-		aoa = plane.aoa,
-		roll = plane.roll,
-		atltitude = plane.point.y,
-		speed = plane.speed,
-		vs = plane.vs,
-		timestamp = timestamp or timer.getTime(),
+		heading = plane.heading, -- 飞机航向（北修正）（角度值）
+		distance = plane.distance, -- 到航母平面距离（m）
+		rtg = plane.rtg, -- RangeToGo（m）
+		angleError = plane.angleError, -- lineup偏差(左正右负)（角度值）
+		gs = plane.gs, -- 飞机当前所处下滑道位置（相对着舰点）（角度值）
+		gsError = plane.gsError, -- 飞机当前所处下滑道偏差（高正低负）（角度值）
+		aoa = plane.aoa, -- 迎角（角度值）
+		roll = plane.roll, -- 滚转角（角度值）
+		atltitude = plane.point.y, -- 高度（m）
+		speed = plane.speed, -- 示空速（m/s）
+		vs = plane.vs, -- 垂直速度（m/s）
+		timestamp = timestamp or timer.getTime(), -- 数据记录时间戳（ModleTime）（秒）
 	}
 	table.insert(self.data, flightData)
 end
@@ -2250,14 +2251,17 @@ function lso.LSO.TrackData:getData(timestamp)
 		return nil
 	end
 end
-function lso.LSO.TrackData:getDataRecord(dataType, length)
-	dataType = string.lower(dataType)
-	length = length <= #self.data and length or #self.data
-	local data = {}
+function lso.LSO.TrackData:getDataRecord(dataType, length, timestamp)
+	length = (type(length) == "number" and length <= #self.data) and length or #self.data
+	local tmp = {}
 	for i = #self.data, #self.data - length + 1, -1 do
-		if (self.data[i][dataType] ~= nil) then
-			table.insert(data, self.data[i][dataType])
+		if (self.data[i][dataType] ~= nil and (timestamp == nil or self.data[i].timestamp <= timestamp)) then
+			table.insert(tmp, self.data[i][dataType])
 		end
+	end
+	local data = {}
+	for i = 1, #tmp do
+		data[i] = table.remove(tmp)
 	end
 	return data
 end
@@ -2419,12 +2423,12 @@ function lso.LSO:track(plane)
 	local landTime = nil
 	local trackFrame = function(args, trackTime)
 		if (plane:updateData() and (not lso.Carrier.turning)) then -- 更新飞行数据
+			local previousData = trackData:getData()
 			-- 记录新的飞行数据
 			trackData:track(trackTime)
 		
 			-- 当剩余距离小于20m时停止指挥，开始连续检测是否成功钩上
-			if (plane.rtg < 20) then
-				local previousData = trackData:getData()
+			if (plane.rtg < 20 and previousData) then
 				if (landTime == nil and ((plane.groundSpeed - lso.Carrier:getSpeed()) < lso.Converter.KNOT_MS(20) or (previousData and (previousData.speed - plane.speed) > 6))) then -- 迅速减速，着舰完成
 					landTime = timer.getTime()
 				end
@@ -2457,6 +2461,7 @@ function lso.LSO:track(plane)
 			-- 计算历史飞行数据
 			local rollVariance = lso.math.getVariance(trackData:getDataRecord("roll", 20))
 			local vsVariance = lso.math.getVariance(trackData:getDataRecord("vs", 20))
+			local vsDiff = previousData and plane.vs - previousData.vs or 0
 			
 			local aoaError = 0
 			local aoaHigh = 0
@@ -2476,7 +2481,7 @@ function lso.LSO:track(plane)
 				aoaError = -1
 			end
 			
-			-- 近距离时将角度误差转换为距离误差，以消除快速发散
+			-- 近距离时预处理角度误差，以消除快速发散
 			local angleError = plane.angleError * math.min(1, plane.rtg / 160)
 			local gsError = plane.gsError * math.min(1, plane.rtg / 160)
 
@@ -2550,6 +2555,7 @@ function lso.LSO:track(plane)
 				-- 根据飞行数据下达指令
 				-- 遵循“先爬升后加速，先减速后下高”原则
 				trackCommand(self.command.TOO_LOW, 		(gsError < -0.6), 						trackTime)
+				trackCommand(self.command.SETTLE,		(plane.rtg < 450 and vsDiff < -0.1),	trackTime)
 				trackCommand(self.command.LOW, 			(gsError < -0.2 and gsError >= -0.6), 	trackTime)
 				if (plane.rtg > 120) then
 					trackCommand(self.command.SLOW, 		(aoaError == 1), 						trackTime)
@@ -2558,7 +2564,7 @@ function lso.LSO:track(plane)
 					trackCommand(self.command.RIGHT, 		(angleError < -1.8), 					trackTime)
 					
 					trackCommand(self.command.FAST, 		(aoaError == -1), 						trackTime)
-					trackCommand(self.command.HIGH, 		(gsError > 1.2), 							trackTime)
+					trackCommand(self.command.HIGH, 		(gsError > 1.2), 						trackTime)
 					
 					trackCommand(self.command.EASY, 		(vsVariance > 1 or rollVariance > 100), trackTime)
 				end
@@ -2575,7 +2581,7 @@ function lso.LSO:track(plane)
 	end
 
 	self.tracking = plane
-	self.trackProcess = timer.scheduleFunction(trackFrame, nil, timer.getTime() + 2)
+	self.trackProcess = timer.scheduleFunction(trackFrame, nil, timer.getTime() + 0.5)
 	return true
 end
 function lso.LSO:cutLand(plane)
