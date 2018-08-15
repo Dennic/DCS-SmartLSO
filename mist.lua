@@ -4020,11 +4020,13 @@ function mist.utils.serialize(name, value, level)
 		if level == nil then level = "" end
 		if level ~= "" then level = level.."	" end
 
-		table.insert(var_str_tbl, level .. name .. " = ")
+		--table.insert(var_str_tbl, level .. name .. " = ")
 
 		if type(value) == "number" or type(value) == "string" or type(value) == "boolean" then
+			table.insert(var_str_tbl, level .. name .. " = ")
 			table.insert(var_str_tbl, basicSerialize(value) ..	",\n")
 		elseif type(value) == "table" then
+			table.insert(var_str_tbl, level .. name .. " = ")
 			table.insert(var_str_tbl, "\n"..level.."{\n")
 
 			for k,v in pairs(value) do -- serialize its fields
@@ -4046,7 +4048,7 @@ function mist.utils.serialize(name, value, level)
 
 			end
 		else
-			log:error('Cannot serialize a $1', type(value))
+			--log:error('Cannot serialize a $1', type(value))
 		end
 		return var_str_tbl
 	end
