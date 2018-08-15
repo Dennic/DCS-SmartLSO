@@ -9204,6 +9204,53 @@ local trackData =
 } -- end of TrackData
 
 lso = {}
+
+-- 单位转换器
+lso.Converter = {
+	KG_LB = function(src)
+		return src * 2.204623
+	end,
+	LB_KG = function(src)
+		return src / 2.204623
+	end,
+	M_MI = function(src)
+		return src * 0.000621
+	end,
+	MI_M = function(src)
+		return src / 0.000621
+	end,
+	M_NM = function(src)
+		return src * 0.00054
+	end,
+	NM_M = function(src)
+		return src / 0.00054
+	end,
+	M_FT = function(src)
+		return src * 3.28084
+	end,
+	FT_M = function(src)
+		return src / 3.28084
+	end,
+	PA_INHG = function(src)
+		return src * 0.007502 * 0.03937
+	end,
+	INHG_PA = function(src)
+		return src / 0.007502 / 0.03937
+	end,
+	K_C = function(src)
+		return src - 273.15
+	end,
+	C_K = function(src)
+		return src + 273.15
+	end,
+	MS_KNOT = function(src)
+		return src * 1.944012
+	end,
+	KNOT_MS = function(src)
+		return src / 1.944012
+	end,
+}
+
 lso.RadioCommand = {__class="RadioCommand", id, sent, tag, speaker, msg, sound, duration, priority, callback}
 function lso.RadioCommand:new(data)
 	local obj = data
@@ -9231,6 +9278,54 @@ function lso.RadioCommand:getDuration()
 	return self.duration
 end
 
+-- 工具模块
+lso.utils = {}
+
+function lso.utils.deepCopy(object)
+	local lookup_table = {}
+	local function _copy(object)
+		if type(object) ~= "table" then
+			return object
+		elseif lookup_table[object] then
+			return lookup_table[object]
+		end
+		local new_table = {}
+		lookup_table[object] = new_table
+		for index, value in pairs(object) do
+			new_table[_copy(index)] = _copy(value)
+		end
+		return setmetatable(new_table, getmetatable(object))
+	end
+	return _copy(object)
+end
+
+function lso.utils.tableSize(t)
+	local count = 0
+	for k, v in pairs(t) do
+		count = count + 1
+	end
+	return count
+end
+
+function lso.utils.listContains(t, v)
+	for key, val in ipairs(t) do
+		if (val == v) then
+			return true, key
+		end
+	end
+	return false, -1
+end
+
+function lso.utils.listRemove(t, v)
+	local contains, key = lso.utils.listContains(t, v)
+	if (contains) then
+		table.remove(t, key)
+		return true
+	else
+		return false
+	end
+end
+
 lso.math ={}
 function lso.math.round(num, idp)
 	local mult = 10^(idp or 0)
@@ -9255,104 +9350,6 @@ function lso.math.random(low, high, decimal)
 		value = round(value)
 	end
 	return value
-end
-
-function lso.math.dirToAngle(direction, degrees)
-	local dir
-	if (degrees) then
-		dir = direction
-	else
-		dir = math.deg(direction)
-	end
-	local diff = 450 - dir
-	local angle
-	if (dir > 90 and dir < 270) then
-		angle = -(360 % diff)
-	else
-		angle = diff % 360
-	end
-	if (degrees) then
-		return angle
-	else
-		return math.rad(angle)
-	end
-end
-function lso.math.angleToDir(angle, degrees)
-	local agl
-	if (degrees) then
-		agl = angle
-	else
-		agl = math.deg(angle)
-	end
-	local diff = agl - 90
-	local dir
-	if (diff > 0) then
-		dir = 450 - agl
-	else
-		dir = math.abs(diff)
-	end
-	if (degrees) then
-		return dir
-	else
-		return math.rad(dir)
-	end
-end
-
-function lso.math.getOffsetPoint(x, y, dir, dist)
-	local angle = math.rad(lso.math.dirToAngle(dir, true))
-	local dx = math.cos(angle) * dist
-	local dy = math.sin(angle) * dist
-	return x + dx, y + dy
-end
-
-
--- 计算相对方位角
--- 根据给定的坐标，计算出两点的相对方位角
--- xs,ys:基准点坐标
--- xt,yt:目标点坐标
--- degrees:布尔值，是否返回角度（默认返回弧度）
-function  lso.math.getAzimuth(xs, ys, xt, yt, degrees)
-	local dx = xt - xs
-	local dy = yt - ys
-	local azimuth
-	if (dx == 0) then
-		if (dy >= 0) then
-			azimuth = 0
-		else
-			azimuth = math.pi
-		end
-	else
-		azimuth = lso.math.angleToDir(math.atan(dy/dx))
-		if (xt < xs) then
-			azimuth = azimuth + math.pi
-		end
-	end
-	azimuth = (azimuth + lso.utils.getNorthCorrection({x=xs, y=ys})) % (2 * math.pi)
-	if (degrees) then
-		return math.deg(azimuth)
-	else
-		return azimuth
-	end
-end
-
-function lso.math.getAzimuthError(a1, a2, degrees)
-	local diff
-	if (degrees) then
-		diff = a1 - a2
-	else
-		diff = math.deg(a1-a2)
-	end
-	local angleDiff
-	if (diff <= 180) then
-		 angleDiff = diff
-	else
-		angleDiff = diff - 360
-	end
-	if (degrees) then
-		return angleDiff
-	else
-		return math.rad(angleDiff)
-	end
 end
 
 -- 计算平均值
@@ -9411,6 +9408,7 @@ end
 function lso.math.getCP(vec1, vec2)
 	return { x = vec1.y*vec2.z - vec1.z*vec2.y, y = vec1.z*vec2.x - vec1.x*vec2.z, z = vec1.x*vec2.y - vec1.y*vec2.x}
 end
+
 lso.LSO = {}
 lso.LSO.TrackData = {__class="TrackData", plane, data, commands, processTime}
 function lso.LSO.TrackData:new(data)
