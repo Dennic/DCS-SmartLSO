@@ -4462,6 +4462,32 @@ local trackData =
 				}, -- end of [291]
 		}, -- end of ["data"]
 } -- end of TrackData
+-- 创建枚举表
+function Enum(...)
+	local items = {...}
+	if (#items == 1 and type(items[1]) == "table") then
+		items = items[1]
+	end
+	local enum = {}
+	local index = 0
+	for i, v in ipairs(items) do
+        enum[v] = index + i
+    end
+	return enum
+end
+-- 模拟 switch 语句块
+function switch(value, ...)
+	local cases = {...}
+	local matched = false
+	for i, case in ipairs(cases) do
+		if (matched or (case[1] == value and type(case[2]) == "function")) then
+			matched = true
+			if (case[2]()) then
+				break
+			end
+		end
+	end
+end
 
 lso = {}
 
@@ -4722,4 +4748,3 @@ function lso.getDumpData()
 	end
 	return data
 end
-return lso
