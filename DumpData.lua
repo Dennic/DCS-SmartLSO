@@ -4463,15 +4463,59 @@ local trackData =
 		}, -- end of ["data"]
 } -- end of TrackData
 -- 创建枚举表
+-- 创建枚举表
+EnumObj = {
+	new=function(self, value)
+		local obj = {value=value}
+		setmetatable(obj, {__index=self, __eq=self.equal, __tostring=self.toString, __add=self.add, __lt=self.lt})
+		return obj
+	end,
+	add=function(self, another)
+		return self:new(self.value + another.value)
+	end,
+	equal=function(self, another)
+		return EnumObj.band(self.value, another.value) > 0
+	end,
+	lt=function(self, another)
+		return self.value < another.value
+	end,
+	toString=function(self)
+		return self.value
+	end,
+	band=function(n1, n2)
+		local t1 = 0
+		local t2 = 0
+		while 2 ^ t1 < n1 do t1 = t1 + 1; end
+		while 2 ^ t2 < n2 do t2 = t2 + 1; end
+		local rlt = 0
+		for i = math.max(t1, t2), 0, -1 do
+			local ex = 2 ^ i
+			local b1 = 0
+			local b2 = 0
+			if (n1 >= ex) then
+				b1 = 1
+				n1 = n1 % ex
+			end
+			if (n2 >= ex) then
+				b2 = 1
+				n2 = n2 % ex
+			end
+			if (b1 == 1 and b2 == 1) then
+				rlt = rlt + ex
+			end
+		end
+		return rlt
+	end
+}
 function Enum(...)
 	local items = {...}
 	if (#items == 1 and type(items[1]) == "table") then
 		items = items[1]
 	end
 	local enum = {}
-	local index = 0
 	for i, v in ipairs(items) do
-        enum[v] = index + i
+		local val = 2 ^ (i - 1)
+        enum[v] = EnumObj:new(val)
     end
 	return enum
 end

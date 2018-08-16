@@ -1,17 +1,3 @@
--- 创建枚举表
-function Enum(...)
-	local items = {...}
-	if (#items == 1 and type(items[1]) == "table") then
-		items = items[1]
-	end
-	local enum = {}
-	local index = 0
-	for i, v in ipairs(items) do
-        enum[v] = index + i
-    end
-	return enum
-end
-
 lso = {}
 
 lso.debug = false
@@ -114,6 +100,78 @@ function lso.log(msg, duration, useMist, name)
 			})
 		else
 			trigger.action.outText(msg, duration)
+		end
+	end
+end
+
+
+-- 创建枚举表
+EnumObj = {
+	new=function(self, value)
+		local obj = {value=value}
+		setmetatable(obj, {__index=self, __eq=self.equal, __tostring=self.toString, __add=self.add, __lt=self.lt})
+		return obj
+	end,
+	add=function(self, another)
+		return self:new(self.value + another.value)
+	end,
+	equal=function(self, another)
+		return EnumObj.band(self.value, another.value) > 0
+	end,
+	lt=function(self, another)
+		return self.value < another.value
+	end,
+	toString=function(self)
+		return self.value
+	end,
+	band=function(n1, n2)
+		local t1 = 0
+		local t2 = 0
+		while 2 ^ t1 < n1 do t1 = t1 + 1; end
+		while 2 ^ t2 < n2 do t2 = t2 + 1; end
+		local rlt = 0
+		for i = math.max(t1, t2), 0, -1 do
+			local ex = 2 ^ i
+			local b1 = 0
+			local b2 = 0
+			if (n1 >= ex) then
+				b1 = 1
+				n1 = n1 % ex
+			end
+			if (n2 >= ex) then
+				b2 = 1
+				n2 = n2 % ex
+			end
+			if (b1 == 1 and b2 == 1) then
+				rlt = rlt + ex
+			end
+		end
+		return rlt
+	end
+}
+function Enum(...)
+	local items = {...}
+	if (#items == 1 and type(items[1]) == "table") then
+		items = items[1]
+	end
+	local enum = {}
+	for i, v in ipairs(items) do
+		local val = 2 ^ (i - 1)
+        enum[v] = EnumObj:new(val)
+    end
+	return enum
+end
+
+-- 模拟 switch 语句块
+function switch(value, ...)
+	local cases = {...}
+	local matched = false
+	for i, case in ipairs(cases) do
+		if (matched or (case[1] == value and type(case[2]) == "function")) then
+			matched = true
+			if (case[2]()) then
+				break
+			end
 		end
 	end
 end
@@ -702,6 +760,8 @@ lso.Plane = {__class="Plane",
 	vs, -- 垂直速度（m/s）
 	fuel, -- 剩余油量（kg）
 	fuelLow, -- 油量告竭
+	fuelMassMax, -- 最大油量
+	updateTime, -- 上次更新数据的时间
 }
 function lso.Plane:new(unitName, aircraftData, onboardNumber)
 	if (unitName == nil) then
@@ -713,7 +773,8 @@ function lso.Plane:new(unitName, aircraftData, onboardNumber)
 		name = unitName,
 		model = aircraftData,
 		number = onboardNumber,
-		fuelLow = false
+		fuelLow = false,
+		fuelMassMax = unit and unit:getDesc().fuelMassMax or nil
 	}
 	setmetatable(obj, {__index = self, __eq = self.equalTo, __tostring = self.toString})
 	return obj
@@ -737,8 +798,8 @@ function lso.Plane:updateData()
 			self.speed = lso.utils.getIndicatedAirSpeed(self.unit)
 			self.groundSpeed = lso.utils.getGroundSpeed(self.unit)
 			self.vs = lso.utils.getVerticalSpeed(self.unit)
-			local fuelMassMax = self.unit:getDesc().fuelMassMax -- 总油重 千克
-			self.fuel = fuelMassMax * self.unit:getFuel()
+			self.fuel = self.fuelMassMax * self.unit:getFuel()
+			self.updateTime = timer.getTime()
 		end)
 		return status
 	else
@@ -765,6 +826,9 @@ end
 function lso.Plane:inAir()
 	return self.unit ~= nil and self.unit:isExist() and self.unit:inAir()
 end
+function lso.Plane:getFuel()
+	return self.fuelMassMax * self.unit:getFuel()
+end
 function lso.Plane.get(unitName)
 	if (type(unitName) == "table") then
 		unitName = unitName:getName()
@@ -773,6 +837,7 @@ function lso.Plane.get(unitName)
 	local plane = lso.DB.planes[unitName]
 	if (unit and plane) then
 		plane.unit = unit
+		plane.fuelMassMax = unit:getDesc().fuelMassMax
 		if (plane:updateData()) then
 			return plane
 		end
@@ -2225,7 +2290,8 @@ function lso.LSO.TrackData:track(timestamp)
 		atltitude = plane.point.y, -- 高度（m）
 		speed = plane.speed, -- 示空速（m/s）
 		vs = plane.vs, -- 垂直速度（m/s）
-		timestamp = timestamp or timer.getTime(), -- 数据记录时间戳（ModleTime）（秒）
+		fuel = plane.fuel, -- 燃油余量 (kg)
+		timestamp = timestamp or timer.getTime(), -- 数据记录时间戳（ModelTime）（秒）
 	}
 	table.insert(self.data, flightData)
 end
@@ -2397,7 +2463,7 @@ function lso.LSO:track(plane)
 	end
 	local callTheBall = 0
 	local trackData = self.TrackData:new(plane)
-	local trackCommand = function (cmd, check, timestamp)
+	local trackCommand = function(cmd, check, timestamp)
 		if check then
 			if self:showCommand(cmd) then
 				trackData:addCommand(cmd, timestamp)
@@ -2424,8 +2490,6 @@ function lso.LSO:track(plane)
 	local trackFrame = function(args, trackTime)
 		if (plane:updateData() and (not lso.Carrier.turning)) then -- 更新飞行数据
 			local previousData = trackData:getData()
-			-- 记录新的飞行数据
-			trackData:track(trackTime)
 		
 			-- 当剩余距离小于20m时停止指挥，开始连续检测是否成功钩上
 			if (plane.rtg < 20 and previousData) then
@@ -2457,6 +2521,9 @@ function lso.LSO:track(plane)
 				end
 				return timer.getTime() + 0.01
 			end
+			
+			-- 记录新的飞行数据
+			trackData:track(trackTime)
 			
 			-- 计算历史飞行数据
 			local rollVariance = lso.math.getVariance(trackData:getDataRecord("roll", 20))
@@ -2548,7 +2615,8 @@ function lso.LSO:track(plane)
 				end
 			end
 			
-			-- lso.log(mist.utils.tableShow(trackData:getData()).."\ngsErrorFix: "..gsError.."\nangleErrorFix: "..angleError, 5, true, "trackData")
+			
+			--lso.log(mist.utils.tableShow(trackData:getData()).."\ngsErrorFix: "..gsError.."\nangleErrorFix: "..angleError.."\nDataCount: "..#trackData.data, 5, true, "trackData")
 			
 			if (callTheBall < 1) then
 
