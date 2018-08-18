@@ -4818,8 +4818,7 @@ function lso.getDumpData()
 	return data
 end
 function lso.test()
-	if type(lso.LSO.comment) == "function" then
-		local trackData = lso.getDumpData()
-		lso.LSO:comment(trackData, lso.LSO.Result.LAND, nil, 2)
-	end
+	assert(type(lso.Comment) == "table", "You need to implement Comment module.")
+	local trackData = lso.getDumpData()
+	lso.Comment:process(trackData, lso.LSO.Result.LAND, nil, 2)
 end
