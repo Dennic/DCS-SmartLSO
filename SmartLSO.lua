@@ -18,23 +18,33 @@ lso.carrierSpeed = 25
 
 -- 音频库
 lso.Sound = {
-	LSO = {
-		PADDLES_CONTACT = "l10n/DEFAULT/paddles_contact.ogg", 
-		KEEP_TURN = "l10n/DEFAULT/keep_your_turn_in.ogg", 
-		CALL_THE_BALL = "l10n/DEFAULT/call_the_ball.ogg", 
-		ROGER_BALL = "l10n/DEFAULT/roger_ball.ogg", 
-		BOLTER = "l10n/DEFAULT/bolter.ogg", 
-		WAVEOFF = "l10n/DEFAULT/waveoff.ogg", 
-		EASY = "l10n/DEFAULT/easy_with_it.ogg", 
-		LEFT = "l10n/DEFAULT/come_left.ogg", 
-		RIGHT = "l10n/DEFAULT/right_for_lineup.ogg", 
-		HIGH = "l10n/DEFAULT/youre_high.ogg", 
-		LOW = "l10n/DEFAULT/little_power.ogg", 
-		TOO_LOW = "l10n/DEFAULT/power.ogg", 
-		FAST = "l10n/DEFAULT/youre_fast.ogg", 
-		SLOW = "l10n/DEFAULT/youre_slow.ogg", 
-		CENTER = "l10n/DEFAULT/youre_on_centerline.ogg", 
-	}
+	RADIO			= {"l10n/DEFAULT/radio_on.ogg",				1	},
+	BOLTER 			= {"l10n/DEFAULT/bolter.ogg", 				1.7	},
+	CALL_THE_BALL 	= {"l10n/DEFAULT/call_the_ball.ogg", 		2	},
+	LEFT 			= {"l10n/DEFAULT/come_left.ogg", 			1.1	},
+	CUT 			= {"l10n/DEFAULT/cut.ogg", 					1	},
+	CLIMB 			= {"l10n/DEFAULT/dont_climb.ogg", 			1.1	},
+	SETTLE 			= {"l10n/DEFAULT/dont_settle.ogg", 			1.1	},
+	EASY 			= {"l10n/DEFAULT/easy_with_it.ogg", 		1.5	},
+	FAIR 			= {"l10n/DEFAULT/fair.ogg", 				1.1	},
+	FOUR_WIRES 		= {"l10n/DEFAULT/four_wires.ogg", 			1.4	},
+	KEEP_TURN 		= {"l10n/DEFAULT/keep_your_turn_in.ogg",	1.4	},
+	LIG 			= {"l10n/DEFAULT/long_in_the_groove.ogg",	3.1	},
+	NO_GRADE 		= {"l10n/DEFAULT/no_grade.ogg", 			1.1	},
+	OK 				= {"l10n/DEFAULT/ok.ogg", 					1.1	},
+	ONE_WIRE 		= {"l10n/DEFAULT/one_wire.ogg", 			1.2	},
+	PADDLES_CONTACT = {"l10n/DEFAULT/paddles_contact.ogg", 		1.5	},
+	LOW 			= {"l10n/DEFAULT/power.ogg", 				1.1	},
+	TOO_LOW 		= {"l10n/DEFAULT/power2.ogg", 				1.1	},
+	RIGHT 			= {"l10n/DEFAULT/right_for_lineup.ogg", 	1.4	}, 
+	ROGER_BALL 		= {"l10n/DEFAULT/roger_ball.ogg", 			1.3	}, 
+	THREE_WIRES 	= {"l10n/DEFAULT/three_wires.ogg", 			1.4	},
+	TWO_WIRES 		= {"l10n/DEFAULT/two_wires.ogg", 			1.3	},
+	WAVEOFF 		= {"l10n/DEFAULT/waveoff.ogg",				1.7	}, 
+	FOUL_DECK 		= {"l10n/DEFAULT/waveoff_foul_deck.ogg",	1.8	}, 
+	FAST 			= {"l10n/DEFAULT/youre_fast.ogg",			1.1	}, 
+	HIGH 			= {"l10n/DEFAULT/youre_high.ogg",			1.1	}, 
+	SLOW 			= {"l10n/DEFAULT/youre_slow.ogg",			1.3	}, 
 }
 
 
@@ -246,21 +256,17 @@ function lso.Broadcast:remove(funcOrId)
 	local removed = false
 	if funcOrId then
 		if (type(funcOrId) == "number") then
-			for e, listeners in pairs(self.listeners) do
-				for i, listener in ipairs(listeners) do
-					if listener.id == funcOrId then
-						table.remove(listeners, i)
-						removed = true
-					end
+			for i, listener in ipairs(self.listeners) do
+				if listener.id == funcOrId then
+					table.remove(self.listeners, i)
+					removed = true
 				end
 			end
 		else
-			for e, listeners in pairs(self.listeners) do
-				for i, listener in ipairs(listeners) do
-					if listener.callback == funcOrId then
-						table.remove(listeners, i)
-						removed = true
-					end
+			for i, listener in ipairs(self.listeners) do
+				if listener.callback == funcOrId then
+					table.remove(self.listeners, i)
+					removed = true
 				end
 			end
 		end
@@ -268,29 +274,24 @@ function lso.Broadcast:remove(funcOrId)
 	return removed
 end
 function lso.Broadcast:receive(events, func)
-	if (events or (type(events) == "table" and #events > 0)) and (type(func) == "function") then
+	if (events and type(func) == "function") then
 		self.count = self.count + 1
 		local listenerId = self.count
-		if (type(events) == "number") then
-			events = {events}
-		end
-		for i, event in ipairs(events) do
-			if self.listeners[event] == nil then
-				self.listeners[event] = {}
-			end
-			table.insert(self.listeners[event], {
-				id = listenerId,
-				callback = func
-			})
-		end
+		table.insert(self.listeners, {
+			id = listenerId,
+			events = events,
+			callback = func
+		})
 		return listenerId
 	end
 end
 function lso.Broadcast.loop(args, timestamp)
 	while #lso.Broadcast.queue > 0 do
 		local item = table.remove(lso.Broadcast.queue, 1)
-		for i, listener in ipairs(lso.Broadcast.listeners[item.event] or {}) do
-			listener.callback(item.event, item.data, item.timestamp)
+		for i, listener in ipairs(lso.Broadcast.listeners) do
+			if (listener.events == item.event) then
+				listener.callback(item.event, item.data, item.timestamp)
+			end
 		end
 	end
 	return timer.getTime() + 0.005
@@ -412,10 +413,11 @@ function lso.Carrier:removePlane(plane)
 				if (self.recovery == true) then
 					self:addRoute(true)
 					self.recovery = false
+					self.recoveryStop = nil
 				end
 			end
 			-- 3分钟内没有新飞机加入回收队列则结束回收作业
-			recoveryStop = timer.scheduleFunction(stopRecovery, nil, timer.getTime() + 180)
+			self.recoveryStop = timer.scheduleFunction(stopRecovery, nil, timer.getTime() + 180)
 		end
 		return true
 	else
@@ -465,16 +467,22 @@ function lso.Carrier:loadTasks(groupData)
 			local groupCon = group:getController()
 			if groupCon then
 				local route = groupData.route
-				if (#route.points > 1) then
-					route.points = {route.points[1]}
+				if (#route.points > 0) then
+					local point = route.points[1]
+					if (type(point.task) == "table" and type(point.task.params) == "table" and type(point.task.params.tasks) == "table") then
+						for i, task in pairs(point.task.params.tasks) do
+							if (task.id == "WrappedAction") then
+								local action = task.params.action
+								if (action.id == "Option") then
+									groupCon:setOption(action.params.name, action.params.value)
+								else
+									groupCon:setCommand(action)
+								end
+							end
+						end
+					end
 				end
 				local tasks = groupData.tasks
-				groupCon:setTask({
-					id = 'Mission',
-					params = {
-						route = route
-					},
-				})
 				for i, task in pairs(tasks) do
 					if (task.id == "WrappedAction") then
 						local action = task.params.action
@@ -669,7 +677,7 @@ end
 function lso.Carrier:onFrame()
 	-- lso.log(string.format("Case %d\ninProcess %d\nrecovery %s\nbackToCruise %s", self.case, #self.inProcess, self.recovery and "true" or "false", self.backToCruise and "true" or "false"), 1, true, "carrierFrame")
 	if (self.needToTurn) then
-		if (#lso.process.getUnitsInStatus({lso.process.Status.INITIAL, lso.process.Status.BREAK, lso.process.Status.PADDLES}) == 0) then
+		if (#lso.process.getUnitsInStatus(lso.process.Status.INITIAL + lso.process.Status.BREAK + lso.process.Status.PADDLES) == 0) then
 			if (self:addRoute()) then
 				self.needToTurn = false
 			end
@@ -855,6 +863,7 @@ end
 
 -- RadioCommand 类
 -- 创建和发送无线电指令
+lso.radioSoundQueue = nil
 lso.RadioCommand = {__class="RadioCommand", id, sent, tag, speaker, msg, sound, duration, priority, showTime, callback}
 lso.RadioCommand.count = 0
 lso.RadioCommand.Priority = Enum(
@@ -866,13 +875,23 @@ lso.RadioCommand.Priority = Enum(
 function lso.RadioCommand:new(tag, speaker, msg, sound, duration, priority, showTime)
 	assert(msg ~= nil, "RadioCommand: msg cannot be nil");
 	self.count = self.count + 1
+	local soundList
+	if (type(sound) == "table" and #sound > 0) then
+		if (type(sound[1]) == "table") then
+			soundList = sound
+		else
+			soundList = {sound}
+		end
+	else
+		soundList = {lso.Sound.RADIO}
+	end
 	local obj = {
 		id = self.count,
 		sent = false,
 		tag = tag or ("RadioCommand"..self.count),
 		speaker = speaker,
 		msg = msg,
-		sound = sound or "l10n/DEFAULT/radio_on.wav",
+		sound = soundList,
 		duration = duration or 1,
 		priority = priority or lso.RadioCommand.Priority.NORMAL,
 		showTime = showTime or 5,
@@ -930,6 +949,10 @@ function lso.RadioCommand:send(speaker, data)
 	local unit = lso.useRadioFrequency and lso.Carrier.radio or lso.Carrier.unit
 	local content = self.msg:format(unpack(self.data or {}))
 	local msg = string.format("%s: %s", self.speaker or "Unknown", content)
+	local soundDuration = 0
+	for i, sound in ipairs(self.sound) do
+		soundDuration = soundDuration + sound[2]
+	end
 	if (unit and unit:isExist()) then
 		self.sent = true
 		if (lso.useRadioFrequency) then
@@ -938,20 +961,37 @@ function lso.RadioCommand:send(speaker, data)
 				local command = { 
 					id = 'TransmitMessage',
 					params = {
-						duration = self.showTime,
+						duration = math.max(self.showTime, soundDuration),
 						subtitle = msg,
 						loop = false,
-						file = self.sound,
+						file = self.sound[1][1],
 					}
 				}
 				controller:setCommand(command)
 			end
 		else
-			trigger.action.outTextForCoalition(unit:getCoalition(), msg, self.showTime)
+			trigger.action.outTextForCoalition(unit:getCoalition(), msg, math.max(self.showTime, soundDuration))
 		end
-		trigger.action.outSoundForCoalition(unit:getCoalition(), self.sound)
+		if (lso.radioSoundQueue ~= nil) then
+			pcall(function()
+				timer.removeFunction(lso.radioSoundQueue)
+			end)
+			lso.radioSoundQueue = nil
+		end
+		local soundIndex = 2
+		local radioSound = function()
+			trigger.action.outSoundForCoalition(unit:getCoalition(), self.sound[soundIndex][1])
+			soundIndex = soundIndex + 1
+			if (soundIndex <= #self.sound) then
+				return timer.getTime() + self.sound[soundIndex][2]
+			end
+		end
+		trigger.action.outSoundForCoalition(unit:getCoalition(), self.sound[1][1])
+		if (#self.sound > 1) then
+			lso.radioSoundQueue = timer.scheduleFunction(radioSound, nil, timer.getTime() + self.sound[1][2])
+		end
 		if (self.callback) then
-			timer.scheduleFunction(self.callback, self, timer.getTime() + self.duration)
+			timer.scheduleFunction(self.callback, self, timer.getTime() + math.max(self.duration, soundDuration))
 		end
 	end
 end
@@ -1241,7 +1281,7 @@ function lso.utils.getRoll(unit)
 		--now, have to get sign of roll.
 		-- by convention, making right roll positive
 		-- to get sign of roll, use the y component of unitpos.z.	For right roll, y component is negative.
-		if unitpos.z.y > 0 then -- left roll, flip the sign of the roll
+		if unitpos.z.y < 0 then -- right roll, flip the sign of the roll
 			Roll = -Roll
 		end
 		return Roll
@@ -1302,6 +1342,9 @@ function lso.utils.getIndicatedAirSpeed(unit)
 	if (type(unit) == "string") then
 		unit = Unit.getByName(unit)
 	end
+	local wind = atmosphere.getWind(unit:getPoint())
+	local velocity = unit:getVelocity()
+	local windSpeed = lso.math.getDP(wind, velocity) / lso.math.getMag(velocity)
 	local tas = lso.utils.getAirSpeed(unit)
 	local point = unit:getPoint()
 	local t, p = atmosphere.getTemperatureAndPressure(point)
@@ -1310,7 +1353,8 @@ function lso.utils.getIndicatedAirSpeed(unit)
 	local tsl, p0 = atmosphere.getTemperatureAndPressure(point)
 	-- EAS = √((TAS^2)/(p0/p)/(T/T0))
 	local eas = math.sqrt(math.pow(tas, 2) / (p0/p) / (t/t0))
-	return eas
+	eas = eas - windSpeed
+	return math.abs(eas)
 end
 
 -- 获取单位气压高度 m （实验）
@@ -1612,11 +1656,8 @@ function lso.process.getUnitsInStatus(status)
 			table.insert(units, unit)
 		end
 	end
-	if (type(status) == "number") then
-		status = {status}
-	end
 	for unitName, currStatus in pairs(lso.process.currentStatus) do
-		if (lso.utils.listContains(status, currStatus)) then
+		if (status == currStatus) then
 			insert(Unit.getByName(unitName))
 		end
 	end
@@ -1706,24 +1747,24 @@ function lso.menu.handler.checkIn(unitName)
 	if (not lso.menu.hasMenu(unit, lso.menu.Command.CHECK_IN)) then
 		return
 	end
-	-- local plane = lso.Plane.get(unit)
-	-- if plane then
-		-- lso.LSO:track(plane)
-	-- end
-	if (lso.process.getStatus(unit) == lso.process.Status.NONE) then
-		local plane = lso.Plane.get(unit)
-		if (plane) then
-			local fuelMess = lso.Converter.KG_LB(plane.fuel) / 1000 -- 千磅
-			local angel = lso.math.round(lso.Converter.M_FT(plane.altitude) / 1000) -- 千英尺
-			local distance = lso.math.round(lso.Converter.M_NM(plane.distance)) -- 海里
-			
-			lso.RadioCommand:new(string.format("%s.check_in", plane.name), plane.number, string.format("Marshal, %s, %03d for %d, Angels %d, State %.1f.", plane.number, (plane.angle + 180) % 360, distance, angel, fuelMess), nil, 4, lso.RadioCommand.Priority.NORMAL)
-				:onFinish(function()
-					lso.Marshal:checkIn(unit)
-				end)
-				:send()
-		end
+	local plane = lso.Plane.get(unit)
+	if plane then
+		lso.LSO:track(plane)
 	end
+	-- if (lso.process.getStatus(unit) == lso.process.Status.NONE) then
+		-- local plane = lso.Plane.get(unit)
+		-- if (plane) then
+			-- local fuelMess = lso.Converter.KG_LB(plane.fuel) / 1000 -- 千磅
+			-- local angel = lso.math.round(lso.Converter.M_FT(plane.altitude) / 1000) -- 千英尺
+			-- local distance = lso.math.round(lso.Converter.M_NM(plane.distance)) -- 海里
+			
+			-- lso.RadioCommand:new(string.format("%s.check_in", plane.name), plane.number, string.format("Marshal, %s, %03d for %d, Angels %d, State %.1f.", plane.number, (plane.angle + 180) % 360, distance, angel, fuelMess), nil, 4, lso.RadioCommand.Priority.NORMAL)
+				-- :onFinish(function()
+					-- lso.Marshal:checkIn(unit)
+				-- end)
+				-- :send()
+		-- end
+	-- end
 end
 function lso.menu.handler.inSight(unitName)
 	local unit = Unit.getByName(unitName)
@@ -1893,7 +1934,7 @@ function lso.Marshal:startOrStopTurning(event)
 end
 -- 广播航母开始回收或停止回收作业
 function lso.Marshal:startOrStopRecovery(event)
-	local units = lso.process.getUnitsInStatus({lso.process.Status.CHECK_IN, lso.process.Status.IN_SIGHT})
+	local units = lso.process.getUnitsInStatus(lso.process.Status.CHECK_IN + lso.process.Status.IN_SIGHT)
 	if (event == lso.Broadcast.event.RECOVERY_START) then
 		table.insert(self.queue, function(timestamp)
 			local radio = lso.RadioCommand:new("recovery", "Marshal", "99, Charlie.", nil, 2, lso.RadioCommand.Priority.NORMAL)
@@ -1923,10 +1964,10 @@ end
 function lso.Marshal:init()
 	self.frameID = lso.addCheckFrame(self) -- 添加 Marshal 检测帧程序
 	
-	lso.Broadcast:receive({lso.Broadcast.event.RECOVERY_START, lso.Broadcast.event.RECOVERY_STOP}, function(event)
+	lso.Broadcast:receive(lso.Broadcast.event.RECOVERY_START + lso.Broadcast.event.RECOVERY_STOP, function(event)
 		self:startOrStopRecovery(event)
 	end)
-	lso.Broadcast:receive({lso.Broadcast.event.TURNING_START, lso.Broadcast.event.TURNING_STOP}, function(event)
+	lso.Broadcast:receive(lso.Broadcast.event.TURNING_START + lso.Broadcast.event.TURNING_STOP, function(event)
 		self:startOrStopTurning(event)
 	end)
 end
@@ -1993,7 +2034,7 @@ function lso.Marshal:process()
 				end
 			end
 		else
-			local units = lso.process.getUnitsInStatus({lso.process.Status.CHECK_IN, lso.process.Status.IN_SIGHT})
+			local units = lso.process.getUnitsInStatus(lso.process.Status.CHECK_IN + lso.process.Status.IN_SIGHT)
 			for i, unit in ipairs(units) do
 				local plane = lso.Plane.get(unit)
 				if (plane and plane.fuelLow == false) then
@@ -2077,11 +2118,6 @@ function lso.Tower:onFrame()
 							lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
 							break
 						end
-						if (lso.Converter.MS_KNOT(plane.groundSpeed - lso.Carrier:getSpeed()) < 50 and plane.distance <= 125) then
-							lso.LSO:cutLand(plane)
-							lso.process.initPlane(plane.unit)
-							break
-						end
 					else
 						local carrierHeadding = lso.Carrier:getHeadding(true)
 						if (status == lso.process.Status.IN_SIGHT) then
@@ -2127,8 +2163,8 @@ function lso.Tower:onFrame()
 								if (lso.Converter.M_FT(plane.altitude) < 1000 and lso.Converter.MS_KNOT(plane.speed) < 400) then
 									-- 航向为航母航向向左大于5度
 									if (lso.math.getAzimuthError(plane.heading, carrierHeadding, true) < -3) then
-										-- 飞机侧倾角向左大于15度
-										if (plane.roll < -25) then
+										-- 飞机侧倾角向左大于25度
+										if (plane.roll > 25) then
 											lso.RadioCommand:new(string.format("%s.break", plane.name), plane.number, string.format("%s, Breaking.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
 												:onFinish(function()
 													lso.RadioCommand:new(string.format("%s.break_reply", plane.name), "Tower", string.format("%s, Dirty up.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
@@ -2189,35 +2225,35 @@ lso.LSO.Grade = Enum(
 lso.LSO.Cause = Enum(
 	"LONG", -- long in the groove
 	"DEVIATE",
-	"SETTLE",
-	"IDLE",
+	"SETTLE", -- settle in close
+	"IDLE", -- idle in the wire
 	"WIRE1", -- caught 1 wire
 	"FOUL_DECK"
 )
 
 -- 着舰信号官固定指令
 lso.LSO.command = {
-	CONTACT 	= 	lso.RadioCommand:new("lso.CONTACT", 		"LSO", 	"%s, Paddles contact.", 		lso.Sound.LSO.PADDLES_CONTACT	, 1.5, lso.RadioCommand.Priority.NORMAL),
-	CALL_BALL 	= 	lso.RadioCommand:new("lso.CALL_THE_BALL", 	"LSO", 	"%s, 3/4 miles, Call the ball.",lso.Sound.LSO.CALL_THE_BALL		, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
-	BALL 		= 	lso.RadioCommand:new("lso.BALL_CALL", 		nil, 	"%s, %s ball, %.1f.",			nil								, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
-	ROGER_BALL 	= 	lso.RadioCommand:new("lso.ROGER_BALL", 		"LSO", 	"Roger ball.", 					lso.Sound.LSO.ROGER_BALL		, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
+	CONTACT 	= 	lso.RadioCommand:new("lso.CONTACT", 		"LSO", 	"%s, Paddles contact.", 		lso.Sound.PADDLES_CONTACT	, 1.5, lso.RadioCommand.Priority.NORMAL),
+	CALL_BALL 	= 	lso.RadioCommand:new("lso.CALL_THE_BALL", 	"LSO", 	"%s, 3/4 miles, Call the ball.",lso.Sound.CALL_THE_BALL		, 2.1, lso.RadioCommand.Priority.NORMAL, 	1.5),
+	BALL 		= 	lso.RadioCommand:new("lso.BALL_CALL", 		nil, 	"%s, %s ball, %.1f.",			nil							, 1.3, lso.RadioCommand.Priority.NORMAL, 	1.5),
+	ROGER_BALL 	= 	lso.RadioCommand:new("lso.ROGER_BALL", 		"LSO", 	"Roger ball.", 					lso.Sound.ROGER_BALL		, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
 					
-	KEEP_TURN	= 	lso.RadioCommand:new("lso.KEEP_TURN", 		"LSO", 	"Keep your turn in.", 			lso.Sound.LSO.KEEP_TURN			, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
-	LIG			= 	lso.RadioCommand:new("lso.LIG", 			"LSO", 	"You're long in the groove.", 	nil								, 2,   lso.RadioCommand.Priority.IMMEDIATELY, 2),
-	HIGH 		= 	lso.RadioCommand:new("lso.HIGH", 			"LSO", 	"You're high!", 				lso.Sound.LSO.HIGH				, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
-	LOW 		= 	lso.RadioCommand:new("lso.LOW", 			"LSO", 	"Little power!", 				lso.Sound.LSO.LOW				, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
-	TOO_LOW 	= 	lso.RadioCommand:new("lso.TOO_LOW", 		"LSO", 	"Power!", 						lso.Sound.LSO.TOO_LOW			, 1.5, lso.RadioCommand.Priority.HIGH,		1.5),
-	LEFT 		= 	lso.RadioCommand:new("lso.LEFT", 			"LSO", 	"Right for lineup!", 			lso.Sound.LSO.RIGHT				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
-	RIGHT 		= 	lso.RadioCommand:new("lso.RIGHT", 			"LSO", 	"Come left!", 					lso.Sound.LSO.LEFT				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
-	EASY 		= 	lso.RadioCommand:new("lso.EASY", 			"LSO", 	"Easy with it.", 				lso.Sound.LSO.EASY				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
-	FAST 		= 	lso.RadioCommand:new("lso.FAST", 			"LSO", 	"You're fast!", 				lso.Sound.LSO.FAST				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
-	SLOW 		= 	lso.RadioCommand:new("lso.SLOW", 			"LSO", 	"You're slow!", 				lso.Sound.LSO.SLOW				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
-	SETTLE 		= 	lso.RadioCommand:new("lso.SETTLE", 			"LSO", 	"Don't settle!", 				nil								, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
-	CLIMB 		= 	lso.RadioCommand:new("lso.CLIMB", 			"LSO", 	"Don't climb!", 				nil								, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	KEEP_TURN	= 	lso.RadioCommand:new("lso.KEEP_TURN", 		"LSO", 	"Keep your turn in.", 			lso.Sound.KEEP_TURN			, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
+	HIGH 		= 	lso.RadioCommand:new("lso.HIGH", 			"LSO", 	"You're high!", 				lso.Sound.HIGH				, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
+	LOW 		= 	lso.RadioCommand:new("lso.LOW", 			"LSO", 	"power.", 						lso.Sound.LOW				, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
+	TOO_LOW 	= 	lso.RadioCommand:new("lso.TOO_LOW", 		"LSO", 	"Power!!", 						lso.Sound.TOO_LOW			, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	LEFT 		= 	lso.RadioCommand:new("lso.LEFT", 			"LSO", 	"Right for lineup!", 			lso.Sound.RIGHT				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	RIGHT 		= 	lso.RadioCommand:new("lso.RIGHT", 			"LSO", 	"Come left!", 					lso.Sound.LEFT				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	EASY 		= 	lso.RadioCommand:new("lso.EASY", 			"LSO", 	"Easy with it.", 				lso.Sound.EASY				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	FAST 		= 	lso.RadioCommand:new("lso.FAST", 			"LSO", 	"You're fast!", 				lso.Sound.FAST				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	SLOW 		= 	lso.RadioCommand:new("lso.SLOW", 			"LSO", 	"You're slow!", 				lso.Sound.SLOW				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	SETTLE 		= 	lso.RadioCommand:new("lso.SETTLE", 			"LSO", 	"Don't settle!", 				lso.Sound.SETTLE			, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	CLIMB 		= 	lso.RadioCommand:new("lso.CLIMB", 			"LSO", 	"Don't climb!", 				lso.Sound.CLIMB				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
 
-	FOUL_DECK	= 	lso.RadioCommand:new("lso.FOUL_DECK",		"LSO", 	"Wave off, Foul deck.", 		lso.Sound.LSO.WAVEOFF			, 6, lso.RadioCommand.Priority.IMMEDIATELY),
-	WAVE_OFF	= 	lso.RadioCommand:new("lso.WAVE_OFF",		"LSO", 	"Wave off! Wave off!", 			lso.Sound.LSO.WAVEOFF			, 6, lso.RadioCommand.Priority.IMMEDIATELY),
-	BOLTER 		= 	lso.RadioCommand:new("lso.BOLTER", 			"LSO", 	"Bolter! Bolter! Bolter!", 		lso.Sound.LSO.BOLTER			, 6, lso.RadioCommand.Priority.IMMEDIATELY),
+	LIG			= 	lso.RadioCommand:new("lso.LIG", 			"LSO", 	"You're long in the groove, Wave off.", lso.Sound.LIG		, 6, lso.RadioCommand.Priority.HIGH),
+	FOUL_DECK	= 	lso.RadioCommand:new("lso.FOUL_DECK",		"LSO", 	"Wave off, Foul deck.", 				lso.Sound.FOUL_DECK , 6, lso.RadioCommand.Priority.HIGH),
+	WAVE_OFF	= 	lso.RadioCommand:new("lso.WAVE_OFF",		"LSO", 	"Wave off! Wave off!", 					lso.Sound.WAVEOFF	, 6, lso.RadioCommand.Priority.HIGH),
+	BOLTER 		= 	lso.RadioCommand:new("lso.BOLTER", 			"LSO", 	"Bolter! Bolter! Bolter!", 				lso.Sound.BOLTER	, 6, lso.RadioCommand.Priority.HIGH),
 }
 
 -- 着舰信号官指令记录
@@ -2428,7 +2464,14 @@ function lso.LSO:track(plane)
 		lso.Tower:checkIn(plane.unit)
 	end
 	local grade = function()
-		lso.log(string.format("Final\nResult: %d\nCause: %d", result.value, cause.value), 8, true)
+		lso.log(string.format("Result: %d\nCause: %d", result.value, cause and cause.value or 0), 5, true)
+		if type(lso.LSO.comment) == "function" then
+			lso.LSO:comment(trackData, result, cause, wire)
+		else
+			if (result == lso.LSO.Result.LAND) then
+				lso.LSO:grade(trackData, result, cause, wire)
+			end
+		end
 	end
 	local trackFrame = function(args, trackTime)
 		if (plane:updateData() and (not lso.Carrier.turning)) then -- 更新飞行数据
@@ -2452,9 +2495,12 @@ function lso.LSO:track(plane)
 						or plane.angleError < 3
 					) then
 						inGroove = true
-						if (plane.rtg > 2200) then
+						if (plane.rtg > 2000) then
 							trackCommand(self.command.LIG, true, trackTime)
-							lig = true
+							cause = lso.LSO.Cause.LONG + cause
+							if (#lso.process.getUnitsInStatus(lso.process.Status.BREAK) > 0) then
+								result = lso.LSO.Result.WAVEOFF + result
+							end
 						else
 							return timer.getTime() + 2
 						end
@@ -2489,7 +2535,6 @@ function lso.LSO:track(plane)
 					end
 					if wire then
 						result = lso.LSO.Result.LAND + result
-						lso.LSO:grade(trackData, wire)
 					end
 					grade()
 					landFinish()
@@ -2511,10 +2556,11 @@ function lso.LSO:track(plane)
 			-- 记录新的飞行数据
 			trackData:track(trackTime)
 			
-			-- 计算历史飞行数据
+			-- 计算飞行数据变化
 			local rollVariance = lso.math.getVariance(trackData:getDataRecord("roll", 20))
 			local vsVariance = lso.math.getVariance(trackData:getDataRecord("vs", 20))
-			local vsDiff = previousData and plane.vs - previousData.vs or 0
+			local vsVariation = previousData and plane.vs - previousData.vs or 0
+			local gsVariation = previousData and plane.gsError - previousData.gsError or 0
 			
 			-- 判断AOA
 			local aoaError = 0
@@ -2583,14 +2629,10 @@ function lso.LSO:track(plane)
 						or gsError < -1.2
 					)
 				end
-				if (shouldWaveOff or lig) then
+				if (shouldWaveOff) then
 					if trackCommand(self.command.WAVE_OFF, true, trackTime) then
 						result = lso.LSO.Result.WAVEOFF + result
-						if lig then
-							cause = lso.LSO.Cause.LONG + cause
-						else
-							cause = lso.LSO.Cause.DEVIATE + cause
-						end
+						cause = lso.LSO.Cause.DEVIATE + cause
 						goAround()
 					end
 				end
@@ -2617,7 +2659,7 @@ function lso.LSO:track(plane)
 				end
 				
 				-- 记录 In close 阶段下沉
-				if (plane.rtg < 450 and vsDiff < -0.08) then
+				if (plane.rtg < 450 and vsVariation < -0.08) then
 					cause = lso.LSO.Cause.SETTLE + cause
 				end
 				
@@ -2626,7 +2668,7 @@ function lso.LSO:track(plane)
 					-- 根据飞行数据下达指令
 					-- 遵循“先爬升后加速，先减速后下高”原则
 					trackCommand(self.command.TOO_LOW, 		(gsError < -0.6), 							trackTime)
-					trackCommand(self.command.SETTLE,		(plane.rtg < 450 and vsDiff < -0.08) or (plane.rtg >= 450 and gsError < 0.5 and vsDiff < -0.1),	trackTime)
+					trackCommand(self.command.SETTLE,		(plane.rtg < 450 and vsVariation < -0.08) or (plane.rtg >= 450 and gsError < 0 and gsVariation < -0.008),	trackTime)
 					trackCommand(self.command.LOW, 			(gsError < -0.2 and gsError >= -0.6), 		trackTime)
 					if (plane.rtg > 120) then
 						trackCommand(self.command.SLOW, 		(aoaError == 1), 						trackTime)
@@ -2635,7 +2677,7 @@ function lso.LSO:track(plane)
 						trackCommand(self.command.RIGHT, 		(angleError < -1), 						trackTime)
 						
 						trackCommand(self.command.FAST, 		(aoaError == -1), 						trackTime)
-						trackCommand(self.command.CLIMB,		(gsError > -0.5 and vsDiff > 0.1),		trackTime)
+						trackCommand(self.command.CLIMB,		(gsError > 0 and gsVariation > 0.008),	trackTime)
 						trackCommand(self.command.HIGH, 		(gsError > 0.4), 						trackTime)
 						
 						trackCommand(self.command.EASY, 		(vsVariance > 0.8 or rollVariance > 80), trackTime)
@@ -2645,7 +2687,7 @@ function lso.LSO:track(plane)
 				
 			end
 			
-			-- lso.log(mist.utils.tableShow(trackData:getData()).."\ngsErrorFix: "..gsError.."\nangleErrorFix: "..angleError.."\nvsDiff: "..vsDiff, 5, true, "trackData")
+			-- lso.log(mist.utils.tableShow(trackData:getData()).."\ngsErrorFix: "..gsError.."\nangleErrorFix: "..angleError.."\nvsVariation: "..vsVariation.."\ngsVariation: "..gsVariation, 5, true, "trackData")
 			return timer.getTime() + 0.1
 		else
 			-- error("LSO onFrame lost unit.")
@@ -2658,54 +2700,13 @@ function lso.LSO:track(plane)
 	timer.scheduleFunction(trackFrame, nil, timer.getTime() + 0.5)
 	return true
 end
-function lso.LSO:cutLand(plane)
-	local landTime = timer.getTime()
-	local trackFrame = function(args, trackTime)
-		if (plane:updateData()) then -- 更新飞行数据
-			if (timer.getTime() - landTime > 8) then
-				return nil
-			elseif ((plane.groundSpeed - lso.Carrier:getSpeed()) < lso.Converter.KNOT_MS(2)) then
-				local wire = nil
-				if (plane.distance <= 86) then
-					wire = 1
-				elseif (plane.distance > 86 and plane.distance <= 98) then
-					wire = 2
-				elseif (plane.distance > 98 and plane.distance <= 110) then
-					wire = 3
-				elseif (plane.distance > 110 and plane.distance <= 125) then
-					wire = 4
-				end
-				if wire then
-					lso.LSO:grade(plane, wire)
-				end
-				return nil
-			end
-			return timer.getTime() + 0.01
-		else
-			return nil
-		end
-	end
-	timer.scheduleFunction(trackFrame, nil, timer.getTime() + 0.05)
-end
 -- 着舰信号官着陆评分
-function lso.LSO:grade(obj, wire)
-	local plane, trackData
-	if (type(obj) == "table") then
-		if (obj.__class == "Plane") then
-			plane = obj
-		elseif (obj.__class == "TrackData") then
-			plane = obj.plane
-			trackData = obj
-		else
-			return
-		end
-	else
-		return
-	end
+function lso.LSO:grade(trackData, result, cause, wire)
+	local plane = trackData.plane
 	-- Grades: 1=OK 2=Fair 3=No Grade 4=Cut
 	local grades = {"OK", "Fair", "No Grade", "Cut"}
 	local grade = 0
-	if (trackData ~= nil) then
+	if (result ~= lso.LSO.Result.WAVEOFF) then
 		grade = 1
 		local command = 0
 		for i, cmd in ipairs(trackData.commands) do
@@ -2745,7 +2746,7 @@ function lso.LSO:grade(obj, wire)
 				end
 			end
 		end
-		if (wire == 1) then
+		if (wire == 1 or (cause ~= nil and cause == lso.LSO.Cause.WIRE1 + lso.LSO.Cause.SETTLE)) then
 			grade = 3
 		end
 	else
@@ -2753,8 +2754,10 @@ function lso.LSO:grade(obj, wire)
 	end
 	local gradeMsg = grade == 0 and "" or string.format(", %s", grades[grade])
 	local wireMsg = wire == nil and "" or string.format(", %d wire%s", wire, wire == 1 and "" or "s")
-	if (gradeMsg ~= "" or wireMsg ~= "") then
-		lso.RadioCommand:new("lso.on_board", "LSO", string.format("%s%s%s.", plane.number, gradeMsg, wireMsg), nil, 2, lso.RadioCommand.Priority.NORMAL)
+	if (gradeMsg ~= "" and wireMsg ~= "") then
+		local gradeSound = ({lso.Sound.OK, lso.Sound.FAIR, lso.Sound.NO_GRADE, lso.Sound.CUT})[grade]
+		local wireSound = ({lso.Sound.ONE_WIRE, lso.Sound.TWO_WIRES, lso.Sound.THREE_WIRES, lso.Sound.FOUR_WIRES})[wire]
+		lso.RadioCommand:new("lso.on_board", "LSO", string.format("%s%s%s.", plane.number, gradeMsg, wireMsg), {gradeSound, wireSound}, 3, lso.RadioCommand.Priority.NORMAL)
 			:send()
 	end
 end
