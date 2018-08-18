@@ -4463,7 +4463,6 @@ local trackData =
 		}, -- end of ["data"]
 } -- end of TrackData
 -- 创建枚举表
--- 创建枚举表
 EnumObj = {
 	new=function(self, value)
 		local obj = {value=value}
@@ -4471,7 +4470,11 @@ EnumObj = {
 		return obj
 	end,
 	add=function(self, another)
-		return self:new(self.value + another.value)
+		if another == nil or self:equal(another) then
+			return self
+		else
+			return EnumObj:new(self.value + another.value)
+		end
 	end,
 	equal=function(self, another)
 		return EnumObj.band(self.value, another.value) > 0
@@ -4740,6 +4743,28 @@ function lso.math.getCP(vec1, vec2)
 end
 
 lso.LSO = {}
+
+lso.LSO.Result = Enum(
+	"LAND",
+	"BOLTER",
+	"WAVEOFF"
+)
+lso.LSO.Grade = Enum(
+	"OK_UNDERLINE",
+	"OK",
+	"FAIR",
+	"NO_GRADE",
+	"CUT"
+)
+lso.LSO.Cause = Enum(
+	"LONG", -- long in the groove
+	"DEVIATE",
+	"SETTLE", -- settle in close
+	"IDLE", -- idle in the wire
+	"WIRE1", -- caught 1 wire
+	"FOUL_DECK"
+)
+
 lso.LSO.TrackData = {__class="TrackData", plane, data, commands, processTime}
 function lso.LSO.TrackData:new(data)
 	local obj = data
@@ -4791,4 +4816,10 @@ function lso.getDumpData()
 		cmd.command = lso.RadioCommand:new(cmd.command)
 	end
 	return data
+end
+function lso.test()
+	if type(lso.LSO.comment) == "function" then
+		local trackData = lso.getDumpData()
+		lso.LSO:comment(trackData, lso.LSO.Result.LAND, nil, 2)
+	end
 end
