@@ -78,122 +78,122 @@ lso.data.carriers = {
 	},
 }
 lso.data.aircrafts = {
-	["FA-18C_hornet"] = {
-		name = "hornet",
-		aoa = 8.1,
-	},
-	["Su-33"] = {
-		name = "falcon",
-		aoa = 9,
-	},
+  ["FA-18C_hornet"] = {
+    name = "hornet",
+    aoa = 8.1,
+  },
+  ["Su-33"] = {
+    name = "falcon",
+    aoa = 9,
+  },
 }
 lso.data.coalitions = {
-	[0] = "neutrals",
-	[1] = "red",
-	[2] = "blue",
+  [0] = "neutrals",
+  [1] = "red",
+  [2] = "blue",
 }
 function lso.data.getAircraft(unit)
-	if (unit) then
-		local typeName = unit:getTypeName()
-		for name, data in pairs(lso.data.aircrafts) do
-			if (name == typeName) then
-				return data
-			end
-		end
-	end
-	return nil
+  if (unit) then
+    local typeName = unit:getTypeName()
+    for name, data in pairs(lso.data.aircrafts) do
+      if (name == typeName) then
+        return data
+      end
+    end
+  end
+  return nil
 end
 
 
 function lso.log(msg, duration, useMist, name)
-	if lso.debug == true then
-		if (useMist and lso.useRadioFrequency) then
-			mist.message.add({
-				text =  msg,
-				displayTime = duration,
-				msgFor = {coa = {"all"}},
-				name = name,
-			})
-		else
-			trigger.action.outText(msg, duration)
-		end
-	end
+  if lso.debug == true then
+    if (useMist and lso.useRadioFrequency) then
+      mist.message.add({
+          text =  msg,
+          displayTime = duration,
+          msgFor = {coa = {"all"}},
+          name = name,
+        })
+    else
+      trigger.action.outText(msg, duration)
+    end
+  end
 end
 
 
 -- 创建枚举表
 EnumObj = {
-	new=function(self, value)
-		local obj = {value=value}
-		setmetatable(obj, {__index=self, __eq=self.equal, __tostring=self.toString, __add=self.add, __lt=self.lt})
-		return obj
-	end,
-	add=function(self, another)
-		if another == nil or self:equal(another) then
-			return self
-		else
-			return EnumObj:new(self.value + another.value)
-		end
-	end,
-	equal=function(self, another)
-		return EnumObj.band(self.value, another.value) > 0
-	end,
-	lt=function(self, another)
-		return self.value < another.value
-	end,
-	toString=function(self)
-		return self.value
-	end,
-	band=function(n1, n2)
-		local t1 = 0
-		local t2 = 0
-		while 2 ^ t1 < n1 do t1 = t1 + 1; end
-		while 2 ^ t2 < n2 do t2 = t2 + 1; end
-		local rlt = 0
-		for i = math.max(t1, t2), 0, -1 do
-			local ex = 2 ^ i
-			local b1 = 0
-			local b2 = 0
-			if (n1 >= ex) then
-				b1 = 1
-				n1 = n1 % ex
-			end
-			if (n2 >= ex) then
-				b2 = 1
-				n2 = n2 % ex
-			end
-			if (b1 == 1 and b2 == 1) then
-				rlt = rlt + ex
-			end
-		end
-		return rlt
-	end
+  new=function(self, value)
+    local obj = {value=value}
+    setmetatable(obj, {__index=self, __eq=self.equal, __tostring=self.toString, __add=self.add, __lt=self.lt})
+    return obj
+  end,
+  add=function(self, another)
+    if another == nil or self:equal(another) then
+      return self
+    else
+      return EnumObj:new(self.value + another.value)
+    end
+  end,
+  equal=function(self, another)
+    return EnumObj.band(self.value, another.value) > 0
+  end,
+  lt=function(self, another)
+    return self.value < another.value
+  end,
+  toString=function(self)
+    return self.value
+  end,
+  band=function(n1, n2)
+    local t1 = 0
+    local t2 = 0
+    while 2 ^ t1 < n1 do t1 = t1 + 1; end
+    while 2 ^ t2 < n2 do t2 = t2 + 1; end
+    local rlt = 0
+    for i = math.max(t1, t2), 0, -1 do
+      local ex = 2 ^ i
+      local b1 = 0
+      local b2 = 0
+      if (n1 >= ex) then
+        b1 = 1
+        n1 = n1 % ex
+      end
+      if (n2 >= ex) then
+        b2 = 1
+        n2 = n2 % ex
+      end
+      if (b1 == 1 and b2 == 1) then
+        rlt = rlt + ex
+      end
+    end
+    return rlt
+  end
 }
 function Enum(...)
-	local items = {...}
-	if (#items == 1 and type(items[1]) == "table") then
-		items = items[1]
-	end
-	local enum = {}
-	for i, v in ipairs(items) do
-		local val = 2 ^ (i - 1)
-        enum[v] = EnumObj:new(val)
-    end
-	return enum
+  local items = {...}
+  if (#items == 1 and type(items[1]) == "table") then
+    items = items[1]
+  end
+  local enum = {}
+  for i, v in ipairs(items) do
+    local val = 2 ^ (i - 1)
+    enum[v] = EnumObj:new(val)
+  end
+  return enum
 end
 
 -- 模拟 switch 语句块
 function switch(value, ...)
-	local cases = {...}
-	local matched = false
-	for i, case in ipairs(cases) do
-		if (matched or (case[1] == value and type(case[2]) == "function")) then
-			matched = true
-			if (case[2]()) then
-				break
-			end
-		end
-	end
+  local cases = {...}
+  local matched = false
+  for i, case in ipairs(cases) do
+    if (matched or (case[1] == value and type(case[2]) == "function")) then
+      matched = true
+      if (case[2]()) then
+        break
+      end
+    end
+  end
 end
 
 
@@ -201,35 +201,35 @@ end
 lso.frameId = 1
 lso.checkFrames = {}
 function lso.addCheckFrame(frame)
-	assert(type(frame) == "table", "argument expected table, got " .. type(frame))
-	assert(frame.onFrame ~= nil and type(frame.onFrame) == "function", "didn't implement function 'onFrame'")
-	local id = lso.frameId
-	table.insert(lso.checkFrames, {frame = frame, id = id})
-	lso.frameId = lso.frameId + 1
-	return id
+  assert(type(frame) == "table", "argument expected table, got " .. type(frame))
+  assert(frame.onFrame ~= nil and type(frame.onFrame) == "function", "didn't implement function 'onFrame'")
+  local id = lso.frameId
+  table.insert(lso.checkFrames, {frame = frame, id = id})
+  lso.frameId = lso.frameId + 1
+  return id
 end
 function lso.removeCheckFrame(id)
-	for k, v in pairs(lso.checkFrames) do
-		if (v.id == id) then
-			lso.checkFrames[k] = nil
-		end
-	end
+  for k, v in pairs(lso.checkFrames) do
+    if (v.id == id) then
+      lso.checkFrames[k] = nil
+    end
+  end
 end
 function lso.doFrame(arg, frameTime)
-	local i = 1
-	while i <= #lso.checkFrames do
-		if lso.checkFrames[i] ~= nil then
-			local status, err = pcall(function(frame)
-				frame:onFrame(frameTime)
-				return true
-			end, lso.checkFrames[i].frame)
-			if (not status) then
-				error(err)
-			end
-		end
-		i = i + 1
-	end
-	return timer.getTime() + 2
+  local i = 1
+  while i <= #lso.checkFrames do
+    if lso.checkFrames[i] ~= nil then
+      local status, err = pcall(function(frame)
+          frame:onFrame(frameTime)
+          return true
+        end, lso.checkFrames[i].frame)
+      if (not status) then
+        error(err)
+      end
+    end
+    i = i + 1
+  end
+  return timer.getTime() + 2
 end
 timer.scheduleFunction(lso.doFrame, nil, timer.getTime() + 1)
 
@@ -309,105 +309,105 @@ lso.DB = {}
 -- 飞机集合
 lso.DB.planes = {}
 function lso.DB.init()
-	local coalition = lso.data.coalitions[lso.Carrier.unit:getCoalition()]
-	for coaName, coaData in pairs(env.mission.coalition) do
-		if (coaName == coalition) then
-			if (coaData.country) then
-				for countryID, countryData in pairs(coaData.country) do
-					for categoryName, categoryData in pairs(countryData) do
-						if (categoryName == "ship") then
-							if (categoryData.group and type(categoryData.group) == 'table' and #categoryData.group > 0) then
-								for groupID, groupData in pairs(categoryData.group) do
-									if (groupData.units and type(groupData.units) == 'table' and #groupData.units > 0) then
-										for unitID, unitData in pairs(groupData.units) do
-											local unitName
-											if env.mission.version > 7 then
-												unitName = env.getValueDictByKey(unitData.name)
-											else
-												unitName = unitData.name
-											end
-											if (unitName == lso.Carrier.unit:getName()) then
-												lso.Carrier:loadTasks(groupData)
-											end
-										end
-									end
-								end
-							end
-						elseif (categoryName == "plane") then
-							if (categoryData.group and type(categoryData.group) == 'table' and #categoryData.group > 0) then
-								for groupID, groupData in pairs(categoryData.group) do
-									if (groupData.units and type(groupData.units) == 'table' and #groupData.units > 0) then
-										for unitID, unitData in pairs(groupData.units) do
-											if (unitData.skill == "Player" or unitData.skill == "Client") then
-												if (lso.data.aircrafts[unitData.type]) then
-													local unitName
-													if env.mission.version > 7 then
-														unitName = env.getValueDictByKey(unitData.name)
-													else
-														unitName = unitData.name
-													end
-													local aircraftData = lso.data.aircrafts[unitData.type]
-													local onboardNumber = unitData.onboard_num
-													local plane = lso.Plane:new(unitName, aircraftData, onboardNumber)
-													if (plane) then
-														lso.DB.planes[unitName] = plane
-													end
-												end
-											end
-										end
-									end
-								end
-							end
-						end
-					end
-				end
-			end
-		end
-	end
+  local coalition = lso.data.coalitions[lso.Carrier.unit:getCoalition()]
+  for coaName, coaData in pairs(env.mission.coalition) do
+    if (coaName == coalition) then
+      if (coaData.country) then
+        for countryID, countryData in pairs(coaData.country) do
+          for categoryName, categoryData in pairs(countryData) do
+            if (categoryName == "ship") then
+              if (categoryData.group and type(categoryData.group) == 'table' and #categoryData.group > 0) then
+                for groupID, groupData in pairs(categoryData.group) do
+                  if (groupData.units and type(groupData.units) == 'table' and #groupData.units > 0) then
+                    for unitID, unitData in pairs(groupData.units) do
+                      local unitName
+                      if env.mission.version > 7 then
+                        unitName = env.getValueDictByKey(unitData.name)
+                      else
+                        unitName = unitData.name
+                      end
+                      if (unitName == lso.Carrier.unit:getName()) then
+                        lso.Carrier:loadTasks(groupData)
+                      end
+                    end
+                  end
+                end
+              end
+            elseif (categoryName == "plane") then
+              if (categoryData.group and type(categoryData.group) == 'table' and #categoryData.group > 0) then
+                for groupID, groupData in pairs(categoryData.group) do
+                  if (groupData.units and type(groupData.units) == 'table' and #groupData.units > 0) then
+                    for unitID, unitData in pairs(groupData.units) do
+                      if (unitData.skill == "Player" or unitData.skill == "Client") then
+                        if (lso.data.aircrafts[unitData.type]) then
+                          local unitName
+                          if env.mission.version > 7 then
+                            unitName = env.getValueDictByKey(unitData.name)
+                          else
+                            unitName = unitData.name
+                          end
+                          local aircraftData = lso.data.aircrafts[unitData.type]
+                          local onboardNumber = unitData.onboard_num
+                          local plane = lso.Plane:new(unitName, aircraftData, onboardNumber)
+                          if (plane) then
+                            lso.DB.planes[unitName] = plane
+                          end
+                        end
+                      end
+                    end
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
 end
 
 
 -- 航母模块
 lso.Carrier = {
-	recovery = false, -- 是否正在回收作业
-	case = 1, -- 回收作业 Case 1-3
-	unit, -- 航母单位
-	radio, -- 航母无线电单位
-	data, -- 航母信息
-	initPoint, -- 航母初始位置 vec2
-	nextPoint, -- 最后一个路径点 vec2
-	lastHeadding, -- 最近一次记录的航向
-	needToTurn = false, -- 是否需要转向
-	turning = false,
-	turningTime = 0,
-	pointCount = 0,
-	inProcess = {}, -- 等待回收中的飞机
-	recoveryStop, -- 结束回收计划
-	backToCruise = false, -- 正在返回巡航区域
+  recovery = false, -- 是否正在回收作业
+  case = 1, -- 回收作业 Case 1-3
+  unit, -- 航母单位
+  radio, -- 航母无线电单位
+  data, -- 航母信息
+  initPoint, -- 航母初始位置 vec2
+  nextPoint, -- 最后一个路径点 vec2
+  lastHeadding, -- 最近一次记录的航向
+  needToTurn = false, -- 是否需要转向
+  turning = false,
+  turningTime = 0,
+  pointCount = 0,
+  inProcess = {}, -- 等待回收中的飞机
+  recoveryStop, -- 结束回收计划
+  backToCruise = false, -- 正在返回巡航区域
 }
 function lso.Carrier:addPlane(plane)
-	local recoveryStarted = false
-	if not (lso.utils.listContains(self.inProcess, plane)) then
-		plane.case = self.case
-		table.insert(self.inProcess, plane)
-		if (lso.carrierSailing and #self.inProcess == 1 and self.recovery == false and self.backToCruise == false) then
-			local eat = lso.Carrier:getEAT()
-			if (eat and (eat - timer.getTime() > 15 * 60)) then
-				-- lso.log(string.format("Charlie %d", (eat - timer.getTime()) / 60), 5, true, "charlieTime")
-				self:addRoute(true)
-				recoveryStarted = true
-			end
-		elseif (lso.carrierSailing == false or self.recovery == true) then
-			recoveryStarted = true
-		end
-		if (self.recoveryStop ~= nil) then
-			timer.removeFunction(self.recoveryStop)
-			self.recoveryStop = nil
-		end
-		return true, recoveryStarted
-	else
-		return false, recoveryStarted
-	end
+  local recoveryStarted = false
+  if not (lso.utils.listContains(self.inProcess, plane)) then
+    plane.case = self.case
+    table.insert(self.inProcess, plane)
+    if (lso.carrierSailing and #self.inProcess == 1 and self.recovery == false and self.backToCruise == false) then
+      local eat = lso.Carrier:getEAT()
+      if (eat and (eat - timer.getTime() > 15 * 60)) then
+        -- lso.log(string.format("Charlie %d", (eat - timer.getTime()) / 60), 5, true, "charlieTime")
+        self:addRoute(true)
+        recoveryStarted = true
+      end
+    elseif (lso.carrierSailing == false or self.recovery == true) then
+      recoveryStarted = true
+    end
+    if (self.recoveryStop ~= nil) then
+      timer.removeFunction(self.recoveryStop)
+      self.recoveryStop = nil
+    end
+    return true, recoveryStarted
+  else
+    return false, recoveryStarted
+  end
 end
 function lso.Carrier:removePlane(plane)
 	if (lso.utils.listContains(self.inProcess, plane)) then
@@ -429,40 +429,40 @@ function lso.Carrier:removePlane(plane)
 	end
 end
 function lso.Carrier:emergency(event)
-	if (lso.carrierSailing and #self.inProcess > 0 and self.recovery == false) then
-		self:addRoute(true)
-	end
+  if (lso.carrierSailing and #self.inProcess > 0 and self.recovery == false) then
+    self:addRoute(true)
+  end
 end
 function lso.Carrier:init()
-	lso.Broadcast:receive(lso.Broadcast.event.EMERGENCY, function(event)
-		self:emergency(event)
-	end)
-	local unit = Unit.getByName(lso.carrierName)
-	local radioUnit = lso.carrierRadioName and Unit.getByName(lso.carrierRadioName) or nil
-	local radio = (lso.useRadioFrequency and radioUnit) and radioUnit or unit
-	if (
-		unit ~= nil and radio ~= nil
-		and unit:isExist() and radio:isExist()
-	) then
-		self.unit = unit
-		self.radio = radio
-		self.initPoint = {x=unit:getPoint().x, y=unit:getPoint().z}
-		self.nextPoint = {x=unit:getPoint().x, y=unit:getPoint().z}
-		local typeName = unit:getTypeName()
-		for name, data in pairs(lso.data.carriers) do
-			if (name == typeName) then
-				self.data = data
-				break
-			end
-		end
-		if (self.data ~= nil) then
-			if (not lso.carrierSailing) then
-				self.recovery = true
-			end
-			return true
-		end
-	end
-	return false
+  lso.Broadcast:receive(lso.Broadcast.event.EMERGENCY, function(event)
+      self:emergency(event)
+    end)
+  local unit = Unit.getByName(lso.carrierName)
+  local radioUnit = lso.carrierRadioName and Unit.getByName(lso.carrierRadioName) or nil
+  local radio = (lso.useRadioFrequency and radioUnit) and radioUnit or unit
+  if (
+    unit ~= nil and radio ~= nil
+    and unit:isExist() and radio:isExist()
+    ) then
+    self.unit = unit
+    self.radio = radio
+    self.initPoint = {x=unit:getPoint().x, y=unit:getPoint().z}
+    self.nextPoint = {x=unit:getPoint().x, y=unit:getPoint().z}
+    local typeName = unit:getTypeName()
+    for name, data in pairs(lso.data.carriers) do
+      if (name == typeName) then
+        self.data = data
+        break
+      end
+    end
+    if (self.data ~= nil) then
+      if (not lso.carrierSailing) then
+        self.recovery = true
+      end
+      return true
+    end
+  end
+  return false
 end
 function lso.Carrier:loadTasks(groupData)
 	if (lso.carrierSailing) then
@@ -503,180 +503,180 @@ function lso.Carrier:loadTasks(groupData)
 	end
 end
 function lso.Carrier:addRoute(clearAll)
-	local nowPoint = self.unit:getPoint()
-	local nextPoint = nil
-	local zone = trigger.misc.getZone(lso.carrierSailArea)
-	local center, radius
-	if type(zone) == "table" then
-		center = zone.point
-		radius = zone.radius
-	else
-		center = self.initPoint
-		radius = lso.Converter.NM_M(10)
-	end
-	self.backToCruise = false
-	if (#self.inProcess > 0 and self.recovery == false) then
-		local dir, speed = lso.utils.getWindInfo(nowPoint, self.data.height + 20) -- 甲板上方 20 米风
-		for dist = 20, 1, -1 do
-			local y, x = lso.math.getOffsetPoint(nowPoint.z, nowPoint.x, (math.deg(dir) + self.data.deck) % 360, lso.Converter.NM_M(dist))
-			local point = {x=x, y=y}
-			if not (lso.utils.checkLand(point, {x=nowPoint.x, y=nowPoint.z})) then
-				nextPoint = point
-				self.recovery = true
-				-- lso.Broadcast:send(lso.Broadcast.event.RECOVERY_START)
-				break
-			end
-		end
-	else
-		if (self.recovery == true) then
-			self.recovery = false
-			self.backToCruise = true
-			lso.Broadcast:send(lso.Broadcast.event.RECOVERY_STOP)
-		end
-	end
-	
-	-- 在航行区域内随机选择下一个路径点
-	if (nextPoint == nil) then
-		local tried = 0
-		repeat
-			if (tried > 1000) then
-				return false
-			end
-			local point = lso.utils.getRandPointInCircle(center, radius)
-			local dist = lso.utils.getDistance(point.x, point.y, nowPoint.x, nowPoint.z)
-			if (dist > radius * math.max(0.3, math.min(6000 / radius, 0.8))) then
-				if not (lso.utils.checkLand(point, {x=nowPoint.x, y=nowPoint.z})) then
-					nextPoint = point
-				end
-			end
-			tried = tried + 1
-		until (nextPoint ~= nil)
-	end
-	
-	local waypoint = {}
-	waypoint.x = nextPoint.x
-	waypoint.y = nextPoint.y
-	waypoint.x = nextPoint.x
-	waypoint.alt = 0
-	waypoint.type = "Turning Point"
-	waypoint.speed = lso.Converter.KNOT_MS(lso.carrierSpeed)
-    waypoint.action = "Turning Point"
-	waypoint.task = {
-		id = 'WrappedAction',
-		params = {
-			action = {
-				id = 'Script',
-				params = {
-					command = "lso.Carrier:reachPoint()",
-				},
-			},
-		},
-	}
-	
-	local misTask = {
-		id = 'Mission',
-		params = {
-			route = {
-				points = {waypoint},
-			},
-		},
-	}
-	
-	local group = self.unit:getGroup()
-	if group then
-		local groupCon = group:getController()
-		if groupCon then
-			if (clearAll) then
-				groupCon:setTask(misTask)
-			else
-				groupCon:pushTask(misTask)
-			end
-		end
-	end
-	
-	self.nextPoint = nextPoint
-	self.pointCount = self.pointCount + 1
-	lso.Broadcast:send(lso.Broadcast.event.TURNING_START)
-	-- trigger.action.markToAll(self.pointCount, string.format("%d", self.pointCount), {x=self.nextPoint.x, y=0, z=self.nextPoint.y})
-	return true
+  local nowPoint = self.unit:getPoint()
+  local nextPoint = nil
+  local zone = trigger.misc.getZone(lso.carrierSailArea)
+  local center, radius
+  if type(zone) == "table" then
+    center = zone.point
+    radius = zone.radius
+  else
+    center = self.initPoint
+    radius = lso.Converter.NM_M(10)
+  end
+  self.backToCruise = false
+  if (#self.inProcess > 0 and self.recovery == false) then
+    local dir, speed = lso.utils.getWindInfo(nowPoint, self.data.height + 20) -- 甲板上方 20 米风
+    for dist = 20, 1, -1 do
+      local y, x = lso.math.getOffsetPoint(nowPoint.z, nowPoint.x, (math.deg(dir) + self.data.deck) % 360, lso.Converter.NM_M(dist))
+      local point = {x=x, y=y}
+      if not (lso.utils.checkLand(point, {x=nowPoint.x, y=nowPoint.z})) then
+        nextPoint = point
+        self.recovery = true
+        -- lso.Broadcast:send(lso.Broadcast.event.RECOVERY_START)
+        break
+      end
+    end
+  else
+    if (self.recovery == true) then
+      self.recovery = false
+      self.backToCruise = true
+      lso.Broadcast:send(lso.Broadcast.event.RECOVERY_STOP)
+    end
+  end
+
+  -- 在航行区域内随机选择下一个路径点
+  if (nextPoint == nil) then
+    local tried = 0
+    repeat
+      if (tried > 1000) then
+        return false
+      end
+      local point = lso.utils.getRandPointInCircle(center, radius)
+      local dist = lso.utils.getDistance(point.x, point.y, nowPoint.x, nowPoint.z)
+      if (dist > radius * math.max(0.3, math.min(6000 / radius, 0.8))) then
+        if not (lso.utils.checkLand(point, {x=nowPoint.x, y=nowPoint.z})) then
+          nextPoint = point
+        end
+      end
+      tried = tried + 1
+    until (nextPoint ~= nil)
+  end
+
+  local waypoint = {}
+  waypoint.x = nextPoint.x
+  waypoint.y = nextPoint.y
+  waypoint.x = nextPoint.x
+  waypoint.alt = 0
+  waypoint.type = "Turning Point"
+  waypoint.speed = lso.Converter.KNOT_MS(lso.carrierSpeed)
+  waypoint.action = "Turning Point"
+  waypoint.task = {
+    id = 'WrappedAction',
+    params = {
+      action = {
+        id = 'Script',
+        params = {
+          command = "lso.Carrier:reachPoint()",
+        },
+      },
+    },
+  }
+
+  local misTask = {
+    id = 'Mission',
+    params = {
+      route = {
+        points = {waypoint},
+      },
+    },
+  }
+
+  local group = self.unit:getGroup()
+  if group then
+    local groupCon = group:getController()
+    if groupCon then
+      if (clearAll) then
+        groupCon:setTask(misTask)
+      else
+        groupCon:pushTask(misTask)
+      end
+    end
+  end
+
+  self.nextPoint = nextPoint
+  self.pointCount = self.pointCount + 1
+  lso.Broadcast:send(lso.Broadcast.event.TURNING_START)
+  -- trigger.action.markToAll(self.pointCount, string.format("%d", self.pointCount), {x=self.nextPoint.x, y=0, z=self.nextPoint.y})
+  return true
 end
 function lso.Carrier:reachPoint()
-	self.needToTurn = true
+  self.needToTurn = true
 end
 function lso.Carrier:getRecoveryCase()
-	if (self.case == 1) then
-		return "Case I"
-	elseif (self.case == 2) then
-		return "Case II"
-	elseif (self.case == 3) then
-		return "Case III"
-	else
-		return ""
-	end
+  if (self.case == 1) then
+    return "Case I"
+  elseif (self.case == 2) then
+    return "Case II"
+  elseif (self.case == 3) then
+    return "Case III"
+  else
+    return ""
+  end
 end
 -- 获取到达下一路径点的预计时间
 function lso.Carrier:getEAT()
-	local speed = lso.Carrier:getSpeed(self.unit)
-	if speed > 0 then
-		local point = self.unit:getPoint()
-		local dist = lso.utils.getDistance(point.x, point.z, self.nextPoint.x, self.nextPoint.y)
-		local timeInSec = dist / speed
-		return timer.getTime() + timeInSec
-	end
+  local speed = lso.Carrier:getSpeed(self.unit)
+  if speed > 0 then
+    local point = self.unit:getPoint()
+    local dist = lso.utils.getDistance(point.x, point.z, self.nextPoint.x, self.nextPoint.y)
+    local timeInSec = dist / speed
+    return timer.getTime() + timeInSec
+  end
 end
 function lso.Carrier:getBRC(current)
-	if (current or not lso.carrierSailing) then
-		return lso.Carrier:getHeadding(true) or 0
-	else
-		local cPoint = self.unit:getPoint()
-		local nextBRC = lso.math.round(lso.math.getAzimuth(cPoint.z, cPoint.x, lso.Carrier.nextPoint.y, lso.Carrier.nextPoint.x, true))
-		return nextBRC
-	end
+  if (current or not lso.carrierSailing) then
+    return lso.Carrier:getHeadding(true) or 0
+  else
+    local cPoint = self.unit:getPoint()
+    local nextBRC = lso.math.round(lso.math.getAzimuth(cPoint.z, cPoint.x, lso.Carrier.nextPoint.y, lso.Carrier.nextPoint.x, true))
+    return nextBRC
+  end
 end
 function lso.Carrier:getTemperatureAndPressure()
-	local point = self.unit:getPoint()
-	point.y = 0
-	local temperature, pressure = atmosphere.getTemperatureAndPressure(point)
-	return lso.Converter.K_C(temperature), lso.Converter.PA_INHG(pressure)
+  local point = self.unit:getPoint()
+  point.y = 0
+  local temperature, pressure = atmosphere.getTemperatureAndPressure(point)
+  return lso.Converter.K_C(temperature), lso.Converter.PA_INHG(pressure)
 end
 -- 计算当前航母的接地点坐标
 -- 返回值 bx, by: 接地点 vec2 坐标
 function  lso.Carrier:getLandingPoint()
-	local carrierPoint = self.unit:getPoint()
-	local carrierHeadding = lso.Carrier:getHeadding(true)
-	local dir = (carrierHeadding + self.data.offset[1]) % 360
-	local x, y = lso.math.getOffsetPoint(carrierPoint.z, carrierPoint.x, dir, lso.Carrier.data.offset[2])
-	return x, y
+  local carrierPoint = self.unit:getPoint()
+  local carrierHeadding = lso.Carrier:getHeadding(true)
+  local dir = (carrierHeadding + self.data.offset[1]) % 360
+  local x, y = lso.math.getOffsetPoint(carrierPoint.z, carrierPoint.x, dir, lso.Carrier.data.offset[2])
+  return x, y
 end
 -- 根据距离和高度，计算出当前所处下滑道角度
 -- distance: 距离
 -- altitude: 高度
 -- 返回值: 下滑道角度
 function lso.Carrier:getGlideSlope(distance, altitude)
-	return math.deg(math.atan((altitude - self.data.height)/distance))
+  return math.deg(math.atan((altitude - self.data.height)/distance))
 end
 -- 获取航母航向
 -- degrees: 是否返回角度值
 -- 返回值: 航母航向
 function lso.Carrier:getHeadding(degrees)
-	return math.deg(lso.utils.getHeading(self.unit, degrees) or 0)
+  return math.deg(lso.utils.getHeading(self.unit, degrees) or 0)
 end
 -- 计算当前进近角相对于当前着陆甲板朝向的角度偏差
 -- angle: 当前进近角
 -- degrees: 是否返回角度值
 -- 返回值: 角度偏差
 function lso.Carrier:getAngleError(angle, degrees)
-	local carrierHeadding = lso.Carrier:getHeadding(true)
-	local stdAngle = (carrierHeadding - self.data.deck) % 360
-	local offset = lso.math.getAzimuthError(angle, stdAngle, true)
-	if (degrees) then
-		return offset
-	else
-		return math.rad(offset)
-	end
+  local carrierHeadding = lso.Carrier:getHeadding(true)
+  local stdAngle = (carrierHeadding - self.data.deck) % 360
+  local offset = lso.math.getAzimuthError(angle, stdAngle, true)
+  if (degrees) then
+    return offset
+  else
+    return math.rad(offset)
+  end
 end
 function lso.Carrier:getSpeed()
-	return lso.utils.getGroundSpeed(self.unit)
+  return lso.utils.getGroundSpeed(self.unit)
 end
 function lso.Carrier:onFrame()
 	-- lso.log(string.format("Case %d\ninProcess %d\nrecovery %s\nbackToCruise %s", self.case, #self.inProcess, self.recovery and "true" or "false", self.backToCruise and "true" or "false"), 1, true, "carrierFrame")
@@ -757,46 +757,46 @@ end
 -- 飞机类
 -- 包含了所需的飞行参数
 lso.Plane = {__class="Plane",
-	case, -- 飞机正在执行的回收状况
-	unit, -- 飞机单位
-	name, -- 飞机单位名称
-	model, -- 飞机型号
-	number, -- 机身编号
-	point, -- 飞机位置
-	altitude, -- 飞机高度（米）
-	heading, -- 飞机航向（角度）
-	azimuth, -- 飞机位于航母的方位角（角度）
-	angle, -- 飞机到着陆点角度（角度）
-	angleError, -- 相对着陆甲板角度误差（角度）
-	distance, -- 到着陆点的平面距离（米）
-	rtg, -- Range-to-go 到着陆点的下滑道剩余距离（米）
-	gs, -- 当前下滑道角度（角度）
-	gsError, -- 当前下滑道相对标准下滑道误差（角度）
-	aoa, -- 攻角（角度）
-	roll, -- 侧倾角
-	speed, -- 示空速（m/s）
-	groundSpeed, -- 地速 (m/s)
-	vs, -- 垂直速度（m/s）
-	fuel, -- 剩余油量（kg）
-	fuelLow, -- 油量告竭
-	fuelMassMax, -- 最大油量
-	updateTime, -- 上次更新数据的时间
+  case, -- 飞机正在执行的回收状况
+  unit, -- 飞机单位
+  name, -- 飞机单位名称
+  model, -- 飞机型号
+  number, -- 机身编号
+  point, -- 飞机位置
+  altitude, -- 飞机高度（米）
+  heading, -- 飞机航向（角度）
+  azimuth, -- 飞机位于航母的方位角（角度）
+  angle, -- 飞机到着陆点角度（角度）
+  angleError, -- 相对着陆甲板角度误差（角度）
+  distance, -- 到着陆点的平面距离（米）
+  rtg, -- Range-to-go 到着陆点的下滑道剩余距离（米）
+  gs, -- 当前下滑道角度（角度）
+  gsError, -- 当前下滑道相对标准下滑道误差（角度）
+  aoa, -- 攻角（角度）
+  roll, -- 侧倾角
+  speed, -- 示空速（m/s）
+  groundSpeed, -- 地速 (m/s)
+  vs, -- 垂直速度（m/s）
+  fuel, -- 剩余油量（kg）
+  fuelLow, -- 油量告竭
+  fuelMassMax, -- 最大油量
+  updateTime, -- 上次更新数据的时间
 }
 function lso.Plane:new(unitName, aircraftData, onboardNumber)
-	if (unitName == nil) then
-		return nil
-	end
-	local unit = Unit.getByName(unitName)
-	local obj = {
-		unit = unit,
-		name = unitName,
-		model = aircraftData,
-		number = onboardNumber,
-		fuelLow = false,
-		fuelMassMax = unit and unit:getDesc().fuelMassMax or nil
-	}
-	setmetatable(obj, {__index = self, __eq = self.equalTo, __tostring = self.toString})
-	return obj
+  if (unitName == nil) then
+    return nil
+  end
+  local unit = Unit.getByName(unitName)
+  local obj = {
+    unit = unit,
+    name = unitName,
+    model = aircraftData,
+    number = onboardNumber,
+    fuelLow = false,
+    fuelMassMax = unit and unit:getDesc().fuelMassMax or nil
+  }
+  setmetatable(obj, {__index = self, __eq = self.equalTo, __tostring = self.toString})
+  return obj
 end
 function lso.Plane:updateData()
 	if (self.unit and self.unit:isExist()) then
@@ -826,42 +826,42 @@ function lso.Plane:updateData()
 	end
 end
 function lso.Plane.equalTo(self, another)
-	local selfName, anotherName
-	if (type(self) == "table") then
-		selfName = self.name
-	else
-		selfName = self
-	end
-	if (type(another) == "table") then
-		anotherName = another.name
-	else
-		anotherName = another
-	end
-	return selfName ~= nil and anotherName ~= nil and selfName == anotherName
+  local selfName, anotherName
+  if (type(self) == "table") then
+    selfName = self.name
+  else
+    selfName = self
+  end
+  if (type(another) == "table") then
+    anotherName = another.name
+  else
+    anotherName = another
+  end
+  return selfName ~= nil and anotherName ~= nil and selfName == anotherName
 end
 function lso.Plane.toString(self)
-	return string.format("<Plane: %s>", self.name)
+  return string.format("<Plane: %s>", self.name)
 end
 function lso.Plane:inAir()
-	return self.unit ~= nil and self.unit:isExist() and self.unit:inAir()
+  return self.unit ~= nil and self.unit:isExist() and self.unit:inAir()
 end
 function lso.Plane:getFuel()
-	return self.fuelMassMax * self.unit:getFuel()
+  return self.fuelMassMax * self.unit:getFuel()
 end
 function lso.Plane.get(unitName)
-	if (type(unitName) == "table") then
-		unitName = unitName:getName()
-	end
-	local unit = Unit.getByName(unitName)
-	local plane = lso.DB.planes[unitName]
-	if (unit and plane) then
-		plane.unit = unit
-		plane.fuelMassMax = unit:getDesc().fuelMassMax
-		if (plane:updateData()) then
-			return plane
-		end
-	end
-	return nil
+  if (type(unitName) == "table") then
+    unitName = unitName:getName()
+  end
+  local unit = Unit.getByName(unitName)
+  local plane = lso.DB.planes[unitName]
+  if (unit and plane) then
+    plane.unit = unit
+    plane.fuelMassMax = unit:getDesc().fuelMassMax
+    if (plane:updateData()) then
+      return plane
+    end
+  end
+  return nil
 end
 
 
@@ -871,10 +871,10 @@ lso.radioSoundQueue = nil
 lso.RadioCommand = {__class="RadioCommand", id, sent, tag, speaker, msg, sound, duration, priority, showTime, callback}
 lso.RadioCommand.count = 0
 lso.RadioCommand.Priority = Enum(
-	"LOW",
-	"NORMAL",
-	"HIGH",
-	"IMMEDIATELY"
+  "LOW",
+  "NORMAL",
+  "HIGH",
+  "IMMEDIATELY"
 )
 function lso.RadioCommand:new(tag, speaker, msg, sound, duration, priority, showTime)
 	assert(msg ~= nil, "RadioCommand: msg cannot be nil");
@@ -904,49 +904,49 @@ function lso.RadioCommand:new(tag, speaker, msg, sound, duration, priority, show
 	return obj
 end
 function lso.RadioCommand.concat(self, another)
-	if (type(another) == "table") then
-		local group
-		if (another.__class == "RadioCommand") then
-			group = lso.RadioCommandGroup:new({self, another})
-		elseif (another.__class == "RadioCommandGroup") then
-			group = another
-			group:add(self, 1)
-		end
-		return group
-	end
+  if (type(another) == "table") then
+    local group
+    if (another.__class == "RadioCommand") then
+      group = lso.RadioCommandGroup:new({self, another})
+    elseif (another.__class == "RadioCommandGroup") then
+      group = another
+      group:add(self, 1)
+    end
+    return group
+  end
 end
 function lso.RadioCommand.equalTo(self, another)
-	local selfObj, anotherObj
-	if (type(self) == "table") then
-		selfObj = self.tag
-	else
-		selfObj = self
-	end
-	if (type(another) == "table") then
-		anotherObj = another.tag
-	else
-		anotherObj = another
-	end
-	return selfObj == anotherObj
+  local selfObj, anotherObj
+  if (type(self) == "table") then
+    selfObj = self.tag
+  else
+    selfObj = self
+  end
+  if (type(another) == "table") then
+    anotherObj = another.tag
+  else
+    anotherObj = another
+  end
+  return selfObj == anotherObj
 end
 function lso.RadioCommand.toString(self)
-	return self.tag
+  return self.tag
 end
 function lso.RadioCommand:onFinish(callback)
-	self.callback = callback
-	return self
+  self.callback = callback
+  return self
 end
 function lso.RadioCommand:getDuration()
-	return self.duration
+  return self.duration
 end
 function lso.RadioCommand:prepare(speaker, data)
-	if type(speaker) == "table" and data == nil then
-		data = speaker
-		speaker = nil
-	end
-	self.speaker = speaker or self.speaker
-	self.data = data or self.data
-	return self
+  if type(speaker) == "table" and data == nil then
+    data = speaker
+    speaker = nil
+  end
+  self.speaker = speaker or self.speaker
+  self.data = data or self.data
+  return self
 end
 function lso.RadioCommand:send(speaker, data)
 	self:prepare(speaker, data)
@@ -1006,122 +1006,122 @@ end
 lso.RadioCommandGroup = {__class="RadioCommandGroup", id, sent, msgQueue, callback, sendTask}
 lso.RadioCommandGroup.count = 0
 function lso.RadioCommandGroup:new(msgQueue)
-	msgQueue = type(msgQueue) == "table" and msgQueue or {}
-	self.count = self.count + 1
-	local obj = {
-		id = self.count,
-		sent = false,
-		msgQueue = msgQueue,
-	}
-	setmetatable(obj, {__index = self, __eq = self.equalTo, __add=self.concat, __concat=self.concat})
-	return obj
+  msgQueue = type(msgQueue) == "table" and msgQueue or {}
+  self.count = self.count + 1
+  local obj = {
+    id = self.count,
+    sent = false,
+    msgQueue = msgQueue,
+  }
+  setmetatable(obj, {__index = self, __eq = self.equalTo, __add=self.concat, __concat=self.concat})
+  return obj
 end
 function lso.RadioCommandGroup:add(msg, index)
-	local i = index or #self.msgQueue + 1
-	if (type(msg) == "table") then
-		if (msg.__class == "RadioCommand") then
-			table.insert(self.msgQueue, i, msg)
-		else
-			for __i, v in ipairs(msg) do
-				table.insert(self.msgQueue, i, v)
-				i = i + 1
-			end
-		end
-	end
+  local i = index or #self.msgQueue + 1
+  if (type(msg) == "table") then
+    if (msg.__class == "RadioCommand") then
+      table.insert(self.msgQueue, i, msg)
+    else
+      for __i, v in ipairs(msg) do
+        table.insert(self.msgQueue, i, v)
+        i = i + 1
+      end
+    end
+  end
 end
 function lso.RadioCommandGroup.concat(self, another)
-	if (type(another) == "table") then
-		if (another.__class == "RadioCommand") then
-			self:add(another)
-		elseif (another.__class == "RadioCommandGroup") then
-			self:add(another)
-		end
-		return self
-	end
+  if (type(another) == "table") then
+    if (another.__class == "RadioCommand") then
+      self:add(another)
+    elseif (another.__class == "RadioCommandGroup") then
+      self:add(another)
+    end
+    return self
+  end
 end
 function lso.RadioCommandGroup.equalTo(self, another)
-	if (
-		type(self) == "table" and type(another) == "table"
-		and self.__class == "RadioCommandGroup" and another.__class == "RadioCommandGroup"
-	) then
-		return self.id == another.id
-	else
-		return false
-	end
+  if (
+    type(self) == "table" and type(another) == "table"
+    and self.__class == "RadioCommandGroup" and another.__class == "RadioCommandGroup"
+    ) then
+    return self.id == another.id
+  else
+    return false
+  end
 end
 function lso.RadioCommandGroup:onFinish(callback)
-	self.callback = callback
-	return self
+  self.callback = callback
+  return self
 end
 function lso.RadioCommandGroup:getDuration()
-	local duration = 0
-	for i, msg in ipairs(self.msgQueue) do
-		duration = duration + msg.duration
-	end
-	return duration
+  local duration = 0
+  for i, msg in ipairs(self.msgQueue) do
+    duration = duration + msg.duration
+  end
+  return duration
 end
 function lso.RadioCommandGroup:send()
-	local sendQueue = function(args, timestamp)
-		local msg = table.remove(self.msgQueue, 1)
-		if msg then
-			msg:send()
-			return timer.getTime() + msg.duration
-		else
-			if self.callback then
-				self.callback(self)
-			end
-			return nil
-		end
-	end
-	self.sendTask = timer.scheduleFunction(sendQueue, nil, timer.getTime() + 0.01)
-	self.sent = true
+  local sendQueue = function(args, timestamp)
+    local msg = table.remove(self.msgQueue, 1)
+    if msg then
+      msg:send()
+      return timer.getTime() + msg.duration
+    else
+      if self.callback then
+        self.callback(self)
+      end
+      return nil
+    end
+  end
+  self.sendTask = timer.scheduleFunction(sendQueue, nil, timer.getTime() + 0.01)
+  self.sent = true
 end
 
 
 -- 单位转换器
 lso.Converter = {
-	KG_LB = function(src)
-		return src * 2.204623
-	end,
-	LB_KG = function(src)
-		return src / 2.204623
-	end,
-	M_MI = function(src)
-		return src * 0.000621
-	end,
-	MI_M = function(src)
-		return src / 0.000621
-	end,
-	M_NM = function(src)
-		return src * 0.00054
-	end,
-	NM_M = function(src)
-		return src / 0.00054
-	end,
-	M_FT = function(src)
-		return src * 3.28084
-	end,
-	FT_M = function(src)
-		return src / 3.28084
-	end,
-	PA_INHG = function(src)
-		return src * 0.007502 * 0.03937
-	end,
-	INHG_PA = function(src)
-		return src / 0.007502 / 0.03937
-	end,
-	K_C = function(src)
-		return src - 273.15
-	end,
-	C_K = function(src)
-		return src + 273.15
-	end,
-	MS_KNOT = function(src)
-		return src * 1.944012
-	end,
-	KNOT_MS = function(src)
-		return src / 1.944012
-	end,
+  KG_LB = function(src)
+    return src * 2.204623
+  end,
+  LB_KG = function(src)
+    return src / 2.204623
+  end,
+  M_MI = function(src)
+    return src * 0.000621
+  end,
+  MI_M = function(src)
+    return src / 0.000621
+  end,
+  M_NM = function(src)
+    return src * 0.00054
+  end,
+  NM_M = function(src)
+    return src / 0.00054
+  end,
+  M_FT = function(src)
+    return src * 3.28084
+  end,
+  FT_M = function(src)
+    return src / 3.28084
+  end,
+  PA_INHG = function(src)
+    return src * 0.007502 * 0.03937
+  end,
+  INHG_PA = function(src)
+    return src / 0.007502 / 0.03937
+  end,
+  K_C = function(src)
+    return src - 273.15
+  end,
+  C_K = function(src)
+    return src + 273.15
+  end,
+  MS_KNOT = function(src)
+    return src * 1.944012
+  end,
+  KNOT_MS = function(src)
+    return src / 1.944012
+  end,
 }
 
 
@@ -1129,145 +1129,145 @@ lso.Converter = {
 lso.utils = {}
 
 function lso.utils.deepCopy(object)
-	local lookup_table = {}
-	local function _copy(object)
-		if type(object) ~= "table" then
-			return object
-		elseif lookup_table[object] then
-			return lookup_table[object]
-		end
-		local new_table = {}
-		lookup_table[object] = new_table
-		for index, value in pairs(object) do
-			new_table[_copy(index)] = _copy(value)
-		end
-		return setmetatable(new_table, getmetatable(object))
-	end
-	return _copy(object)
+  local lookup_table = {}
+  local function _copy(object)
+    if type(object) ~= "table" then
+      return object
+    elseif lookup_table[object] then
+      return lookup_table[object]
+    end
+    local new_table = {}
+    lookup_table[object] = new_table
+    for index, value in pairs(object) do
+      new_table[_copy(index)] = _copy(value)
+    end
+    return setmetatable(new_table, getmetatable(object))
+  end
+  return _copy(object)
 end
 
 function lso.utils.tableSize(t)
-	local count = 0
-	for k, v in pairs(t) do
-		count = count + 1
-	end
-	return count
+  local count = 0
+  for k, v in pairs(t) do
+    count = count + 1
+  end
+  return count
 end
 
 function lso.utils.listContains(t, v)
-	for key, val in ipairs(t) do
-		if (val == v) then
-			return true, key
-		end
-	end
-	return false, -1
+  for key, val in ipairs(t) do
+    if (val == v) then
+      return true, key
+    end
+  end
+  return false, -1
 end
 
 function lso.utils.listRemove(t, v)
-	local contains, key = lso.utils.listContains(t, v)
-	if (contains) then
-		table.remove(t, key)
-		return true
-	else
-		return false
-	end
+  local contains, key = lso.utils.listContains(t, v)
+  if (contains) then
+    table.remove(t, key)
+    return true
+  else
+    return false
+  end
 end
 
 -- 获取当前游戏中时间
 function lso.utils.getTime(t)
-	local timeInSec = 0
-	if t and type(t) == 'number' then
-		timeInSec = t
-	else
-		timeInSec = lso.math.round(timer.getAbsTime() + env.mission.start_time)
-	end
-	local timeData = {h=0, m=0, s=0}
-	timeInSec = timeInSec % 86400
-	while timeInSec >= 3600 do
-		timeData.h = timeData.h + 1
-		timeInSec = timeInSec - 3600
-	end
-	while timeInSec >= 60 do
-		timeData.m = timeData.m + 1
-		timeInSec = timeInSec - 60
-	end
-	timeData.s = timeInSec
-	return timeData
+  local timeInSec = 0
+  if t and type(t) == 'number' then
+    timeInSec = t
+  else
+    timeInSec = lso.math.round(timer.getAbsTime() + env.mission.start_time)
+  end
+  local timeData = {h=0, m=0, s=0}
+  timeInSec = timeInSec % 86400
+  while timeInSec >= 3600 do
+    timeData.h = timeData.h + 1
+    timeInSec = timeInSec - 3600
+  end
+  while timeInSec >= 60 do
+    timeData.m = timeData.m + 1
+    timeInSec = timeInSec - 60
+  end
+  timeData.s = timeInSec
+  return timeData
 end
 
 -- 计算两点欧氏距离
 function lso.utils.getDistance(x1, y1, x2, y2)
-	return math.sqrt(math.pow(x1 - x2, 2) + math.pow(y1 - y2, 2))
+  return math.sqrt(math.pow(x1 - x2, 2) + math.pow(y1 - y2, 2))
 end
 
 -- 获取指定坐标点风数据 (风向，风速)
 function lso.utils.getWindInfo(gPoint, alt)
-	local point = lso.utils.deepCopy(gPoint)
-	if not point.z then --convert vec2 to Vec3
-		point.z = point.y
-		point.y = 1
-	else
-		if point.y < 1 then
-			point.y = 1
-		end
-	end
-	if alt ~= nil then
-		point.y = alt
-	end
-	local wind = atmosphere.getWind(point)
-	local heading = math.atan2(wind.z, wind.x)
-	heading = heading + lso.utils.getNorthCorrection(point)
-	if heading < 0 then
-		heading = heading + 2*math.pi
-	end
-	heading = (heading + math.pi) % (2 * math.pi)
-	local speed = lso.math.getMag(wind) or 0
-	return heading, speed
+  local point = lso.utils.deepCopy(gPoint)
+  if not point.z then --convert vec2 to Vec3
+    point.z = point.y
+    point.y = 1
+  else
+    if point.y < 1 then
+      point.y = 1
+    end
+  end
+  if alt ~= nil then
+    point.y = alt
+  end
+  local wind = atmosphere.getWind(point)
+  local heading = math.atan2(wind.z, wind.x)
+  heading = heading + lso.utils.getNorthCorrection(point)
+  if heading < 0 then
+    heading = heading + 2*math.pi
+  end
+  heading = (heading + math.pi) % (2 * math.pi)
+  local speed = lso.math.getMag(wind) or 0
+  return heading, speed
 end
 
 -- 获取单位航向 MIST
 function lso.utils.getHeading(unit, rawHeading)
-	local unitpos = unit:getPosition()
-	if unitpos then
-		local heading = math.atan2(unitpos.x.z, unitpos.x.x)
-		if not rawHeading then
-			heading = heading + lso.utils.getNorthCorrection(unitpos.p)
-		end
-		if heading < 0 then
-			heading = heading + 2*math.pi	-- put heading in range of 0 to 2*pi
-		end
-		return heading
-	end
+  local unitpos = unit:getPosition()
+  if unitpos then
+    local heading = math.atan2(unitpos.x.z, unitpos.x.x)
+    if not rawHeading then
+      heading = heading + lso.utils.getNorthCorrection(unitpos.p)
+    end
+    if heading < 0 then
+      heading = heading + 2*math.pi	-- put heading in range of 0 to 2*pi
+    end
+    return heading
+  end
 end
 
 -- 获取单位攻角 MIST
 function lso.utils.getAoA(unit)
-	local unitpos = unit:getPosition()
-	if unitpos then
-		local unitvel = unit:getVelocity()
-		if lso.math.getMag(unitvel) ~= 0 then --must have non-zero velocity!
-			local AxialVel = {}	--unit velocity transformed into aircraft axes directions
-			--transform velocity components in direction of aircraft axes.
-			AxialVel.x = lso.math.getDP(unitpos.x, unitvel)
-			AxialVel.y = lso.math.getDP(unitpos.y, unitvel)
-			AxialVel.z = lso.math.getDP(unitpos.z, unitvel)
-			-- AoA is angle between unitpos.x and the x and y velocities
-			local AoA = math.acos(lso.math.getDP({x = 1, y = 0, z = 0}, {x = AxialVel.x, y = AxialVel.y, z = 0})/lso.math.getMag({x = AxialVel.x, y = AxialVel.y, z = 0}))
-			--now set correct direction:
-			if AxialVel.y > 0 then
-				AoA = -AoA
-			end
-			return AoA
-		end
-	end
+  local unitpos = unit:getPosition()
+  if unitpos then
+    local unitvel = unit:getVelocity()
+    if lso.math.getMag(unitvel) ~= 0 then --must have non-zero velocity!
+      local AxialVel = {}	--unit velocity transformed into aircraft axes directions
+      --transform velocity components in direction of aircraft axes.
+      AxialVel.x = lso.math.getDP(unitpos.x, unitvel)
+      AxialVel.y = lso.math.getDP(unitpos.y, unitvel)
+      AxialVel.z = lso.math.getDP(unitpos.z, unitvel)
+      -- AoA is angle between unitpos.x and the x and y velocities
+      local AoA = math.acos(lso.math.getDP({x = 1, y = 0, z = 0}, {x = AxialVel.x, y = AxialVel.y, z = 0})/lso.math.getMag({x = AxialVel.x, y = AxialVel.y, z = 0}))
+      --now set correct direction:
+      if AxialVel.y > 0 then
+        AoA = -AoA
+      end
+      return AoA
+    end
+  end
 end
 
 -- 获取单位俯仰角 MIST
 function lso.utils.getPitch(unit)
-	local unitpos = unit:getPosition()
-	if unitpos then
-		return math.asin(unitpos.x.y)
-	end
+  local unitpos = unit:getPosition()
+  if unitpos then
+    return math.asin(unitpos.x.y)
+  end
 end
 
 -- 获取单位侧倾角 MIST
@@ -1294,51 +1294,51 @@ end
 
 -- 获取单位偏航角 MIST
 function lso.utils.getYaw(unit)
-	local unitpos = unit:getPosition()
-	if unitpos then
-		-- get unit velocity
-		local unitvel = unit:getVelocity()
-		if lso.math.getMag(unitvel) ~= 0 then --must have non-zero velocity!
-			local AxialVel = {}	--unit velocity transformed into aircraft axes directions
-			--transform velocity components in direction of aircraft axes.
-			AxialVel.x = lso.math.getDP(unitpos.x, unitvel)
-			AxialVel.y = lso.math.getDP(unitpos.y, unitvel)
-			AxialVel.z = lso.math.getDP(unitpos.z, unitvel)
-			--Yaw is the angle between unitpos.x and the x and z velocities
-			--define right yaw as positive
-			local Yaw = math.acos(lso.math.getDP({x = 1, y = 0, z = 0}, {x = AxialVel.x, y = 0, z = AxialVel.z})/lso.math.getMag({x = AxialVel.x, y = 0, z = AxialVel.z}))
-			--now set correct direction:
-			if AxialVel.z > 0 then
-				Yaw = -Yaw
-			end
-			return Yaw
-		end
-	end
+  local unitpos = unit:getPosition()
+  if unitpos then
+    -- get unit velocity
+    local unitvel = unit:getVelocity()
+    if lso.math.getMag(unitvel) ~= 0 then --must have non-zero velocity!
+      local AxialVel = {}	--unit velocity transformed into aircraft axes directions
+      --transform velocity components in direction of aircraft axes.
+      AxialVel.x = lso.math.getDP(unitpos.x, unitvel)
+      AxialVel.y = lso.math.getDP(unitpos.y, unitvel)
+      AxialVel.z = lso.math.getDP(unitpos.z, unitvel)
+      --Yaw is the angle between unitpos.x and the x and z velocities
+      --define right yaw as positive
+      local Yaw = math.acos(lso.math.getDP({x = 1, y = 0, z = 0}, {x = AxialVel.x, y = 0, z = AxialVel.z})/lso.math.getMag({x = AxialVel.x, y = 0, z = AxialVel.z}))
+      --now set correct direction:
+      if AxialVel.z > 0 then
+        Yaw = -Yaw
+      end
+      return Yaw
+    end
+  end
 end
 
 -- 获取单位垂直速度 m/s
 function lso.utils.getVerticalSpeed(unit)
-	if (type(unit) == "string") then
-		unit = Unit.getByName(unit)
-	end
-	return unit:getVelocity().y
+  if (type(unit) == "string") then
+    unit = Unit.getByName(unit)
+  end
+  return unit:getVelocity().y
 end
 
 -- 获取单位真空速 m/s
 function lso.utils.getAirSpeed(unit)
-	if (type(unit) == "string") then
-		unit = Unit.getByName(unit)
-	end
-	return lso.math.getMag(unit:getVelocity()) or 0
+  if (type(unit) == "string") then
+    unit = Unit.getByName(unit)
+  end
+  return lso.math.getMag(unit:getVelocity()) or 0
 end
 
 -- 获取单位地速 m/s
 function lso.utils.getGroundSpeed(unit)
-	if (type(unit) == "string") then
-		unit = Unit.getByName(unit)
-	end
-	local vel = unit:getVelocity()
-	return lso.math.getMag(vel.x, vel.z) or 0
+  if (type(unit) == "string") then
+    unit = Unit.getByName(unit)
+  end
+  local vel = unit:getVelocity()
+  return lso.math.getMag(vel.x, vel.z) or 0
 end
 
 -- 获取单位示空速 m/s
@@ -1363,149 +1363,149 @@ end
 
 -- 获取单位气压高度 m （实验）
 function lso.utils.getBaroAltitude(unit)
-	if (type(unit) == "string") then
-		unit = Unit.getByName(unit)
-	end
-	local point = unit:getPoint()
-	local t, p = atmosphere.getTemperatureAndPressure(point)
-	point.y = 0
-	local t0, p0 = atmosphere.getTemperatureAndPressure(point)
-	local alt = (1 - math.pow(p/p0, 1/5.256)) / 0.00002257
-	return alt
+  if (type(unit) == "string") then
+    unit = Unit.getByName(unit)
+  end
+  local point = unit:getPoint()
+  local t, p = atmosphere.getTemperatureAndPressure(point)
+  point.y = 0
+  local t0, p0 = atmosphere.getTemperatureAndPressure(point)
+  local alt = (1 - math.pow(p/p0, 1/5.256)) / 0.00002257
+  return alt
 end
 
 -- 获取圈中随机点 MIST
 function lso.utils.getRandPointInCircle(point, radius, innerRadius)
-	local theta = 2*math.pi*math.random()
-	local rad = math.random() + math.random()
-	if rad > 1 then
-		rad = 2 - rad
-	end
+  local theta = 2*math.pi*math.random()
+  local rad = math.random() + math.random()
+  if rad > 1 then
+    rad = 2 - rad
+  end
 
-	local radMult
-	if innerRadius and innerRadius <= radius then
-		radMult = (radius - innerRadius)*rad + innerRadius
-	else
-		radMult = radius*rad
-	end
+  local radMult
+  if innerRadius and innerRadius <= radius then
+    radMult = (radius - innerRadius)*rad + innerRadius
+  else
+    radMult = radius*rad
+  end
 
-	if not point.z then --might as well work with vec2/3
-		point.z = point.y
-	end
+  if not point.z then --might as well work with vec2/3
+    point.z = point.y
+  end
 
-	local rndCoord
-	if radius > 0 then
-		rndCoord = {x = math.cos(theta)*radMult + point.x, y = math.sin(theta)*radMult + point.z}
-	else
-		rndCoord = {x = point.x, y = point.z}
-	end
-	return rndCoord
+  local rndCoord
+  if radius > 0 then
+    rndCoord = {x = math.cos(theta)*radMult + point.x, y = math.sin(theta)*radMult + point.z}
+  else
+    rndCoord = {x = point.x, y = point.z}
+  end
+  return rndCoord
 end
 
 -- 获取指定坐标点的北修正量
 function lso.utils.getNorthCorrection(gPoint)
-	local point = lso.utils.deepCopy(gPoint)
-	if not point.z then --convert vec2 to Vec3
-		point.z = point.y
-		point.y = 0
-	end
-	local lat, lon = coord.LOtoLL(point)
-	local north_posit = coord.LLtoLO(lat + 1, lon)
-	return math.atan2(north_posit.z - point.z, north_posit.x - point.x)
+  local point = lso.utils.deepCopy(gPoint)
+  if not point.z then --convert vec2 to Vec3
+    point.z = point.y
+    point.y = 0
+  end
+  local lat, lon = coord.LOtoLL(point)
+  local north_posit = coord.LLtoLO(lat + 1, lon)
+  return math.atan2(north_posit.z - point.z, north_posit.x - point.x)
 end
 
 -- 检查两点之间是否存在陆地 Vec2
 function lso.utils.checkLand(point1, point2)
-	local dist = lso.utils.getDistance(point1.x, point1.y, point2.x, point2.y)
-	local dx = point1.x - point2.x
-	local dy = point1.y - point2.y
+  local dist = lso.utils.getDistance(point1.x, point1.y, point2.x, point2.y)
+  local dx = point1.x - point2.x
+  local dy = point1.y - point2.y
 
-	local hasLand = false
-	for delta = 1, dist do
-		local x = point2.x + (dx * (delta / dist))
-		local y = point2.y + (dy * (delta / dist))
-		if (land.getSurfaceType({x=x, y=y}) ~= land.SurfaceType.WATER) then
-			hasLand = true
-			break
-		end
-	end
-	return hasLand
+  local hasLand = false
+  for delta = 1, dist do
+    local x = point2.x + (dx * (delta / dist))
+    local y = point2.y + (dy * (delta / dist))
+    if (land.getSurfaceType({x=x, y=y}) ~= land.SurfaceType.WATER) then
+      hasLand = true
+      break
+    end
+  end
+  return hasLand
 end
 
 -- 数学计算工具模块
 lso.math ={}
 
 function lso.math.round(num, idp)
-	local mult = 10^(idp or 0)
-	return math.floor(num * mult + 0.5) / mult
+  local mult = 10^(idp or 0)
+  return math.floor(num * mult + 0.5) / mult
 end
 
 function lso.math.random(low, high, decimal)
-	if (low == nil and high == nil) then
-		decimal = true
-	end
-	low = low or 1
-	if high == nil then
-		high = low
-		low = 0
-	end
-	local value = math.random()
-	for i=1,50 do
-		value = math.random()
-	end
-	value = value * (high - low) + low
-	if not decimal then
-		value = round(value)
-	end
-	return value
+  if (low == nil and high == nil) then
+    decimal = true
+  end
+  low = low or 1
+  if high == nil then
+    high = low
+    low = 0
+  end
+  local value = math.random()
+  for i=1,50 do
+    value = math.random()
+  end
+  value = value * (high - low) + low
+  if not decimal then
+    value = round(value)
+  end
+  return value
 end
 
 function lso.math.dirToAngle(direction, degrees)
-	local dir
-	if (degrees) then
-		dir = direction
-	else
-		dir = math.deg(direction)
-	end
-	local diff = 450 - dir
-	local angle
-	if (dir > 90 and dir < 270) then
-		angle = -(360 % diff)
-	else
-		angle = diff % 360
-	end
-	if (degrees) then
-		return angle
-	else
-		return math.rad(angle)
-	end
+  local dir
+  if (degrees) then
+    dir = direction
+  else
+    dir = math.deg(direction)
+  end
+  local diff = 450 - dir
+  local angle
+  if (dir > 90 and dir < 270) then
+    angle = -(360 % diff)
+  else
+    angle = diff % 360
+  end
+  if (degrees) then
+    return angle
+  else
+    return math.rad(angle)
+  end
 end
 function lso.math.angleToDir(angle, degrees)
-	local agl
-	if (degrees) then
-		agl = angle
-	else
-		agl = math.deg(angle)
-	end
-	local diff = agl - 90
-	local dir
-	if (diff > 0) then
-		dir = 450 - agl
-	else
-		dir = math.abs(diff)
-	end
-	if (degrees) then
-		return dir
-	else
-		return math.rad(dir)
-	end
+  local agl
+  if (degrees) then
+    agl = angle
+  else
+    agl = math.deg(angle)
+  end
+  local diff = agl - 90
+  local dir
+  if (diff > 0) then
+    dir = 450 - agl
+  else
+    dir = math.abs(diff)
+  end
+  if (degrees) then
+    return dir
+  else
+    return math.rad(dir)
+  end
 end
 
 function lso.math.getOffsetPoint(x, y, dir, dist)
-	local angle = math.rad(lso.math.dirToAngle(dir, true))
-	local dx = math.cos(angle) * dist
-	local dy = math.sin(angle) * dist
-	return x + dx, y + dy
+  local angle = math.rad(lso.math.dirToAngle(dir, true))
+  local dx = math.cos(angle) * dist
+  local dy = math.sin(angle) * dist
+  return x + dx, y + dy
 end
 
 
@@ -1515,123 +1515,123 @@ end
 -- xt,yt:目标点坐标
 -- degrees:布尔值，是否返回角度（默认返回弧度）
 function  lso.math.getAzimuth(xs, ys, xt, yt, degrees)
-	local dx = xt - xs
-	local dy = yt - ys
-	local azimuth
-	if (dx == 0) then
-		if (dy >= 0) then
-			azimuth = 0
-		else
-			azimuth = math.pi
-		end
-	else
-		azimuth = lso.math.angleToDir(math.atan(dy/dx))
-		if (xt < xs) then
-			azimuth = azimuth + math.pi
-		end
-	end
-	azimuth = (azimuth + lso.utils.getNorthCorrection({x=xs, y=ys})) % (2 * math.pi)
-	if (degrees) then
-		return math.deg(azimuth)
-	else
-		return azimuth
-	end
+  local dx = xt - xs
+  local dy = yt - ys
+  local azimuth
+  if (dx == 0) then
+    if (dy >= 0) then
+      azimuth = 0
+    else
+      azimuth = math.pi
+    end
+  else
+    azimuth = lso.math.angleToDir(math.atan(dy/dx))
+    if (xt < xs) then
+      azimuth = azimuth + math.pi
+    end
+  end
+  azimuth = (azimuth + lso.utils.getNorthCorrection({x=xs, y=ys})) % (2 * math.pi)
+  if (degrees) then
+    return math.deg(azimuth)
+  else
+    return azimuth
+  end
 end
 
 function lso.math.getAzimuthError(a1, a2, degrees)
-	local diff
-	if (degrees) then
-		diff = a1 - a2
-	else
-		diff = math.deg(a1-a2)
-	end
-	local angleDiff
-	if (diff <= 180) then
-		 angleDiff = diff
-	else
-		angleDiff = diff - 360
-	end
-	if (degrees) then
-		return angleDiff
-	else
-		return math.rad(angleDiff)
-	end
+  local diff
+  if (degrees) then
+    diff = a1 - a2
+  else
+    diff = math.deg(a1-a2)
+  end
+  local angleDiff
+  if (diff <= 180) then
+    angleDiff = diff
+  else
+    angleDiff = diff - 360
+  end
+  if (degrees) then
+    return angleDiff
+  else
+    return math.rad(angleDiff)
+  end
 end
 
 -- 计算平均值
 -- 计算一组数据的平均值
 -- data:数据 table
 function lso.math.getAverage(data)
-	if (#data == 0) then
-		return 0
-	end
-	local avg = 0	-- 平均值
-	for i, v in ipairs(data) do
-		avg = avg + v
-	end
-	avg = avg / #data
-	return avg
+  if (#data == 0) then
+    return 0
+  end
+  local avg = 0	-- 平均值
+  for i, v in ipairs(data) do
+    avg = avg + v
+  end
+  avg = avg / #data
+  return avg
 end
 
 -- 计算方差
 -- 计算一组数据的方差
 -- data:数据 table
 function lso.math.getVariance(data)
-	if (#data < 2) then
-		return 0
-	end
-	local avg = lso.math.getAverage(data)
-	local sum = 0
-	for i, v in ipairs(data) do
-		sum = sum + math.pow(v - avg, 2)
-	end
+  if (#data < 2) then
+    return 0
+  end
+  local avg = lso.math.getAverage(data)
+  local sum = 0
+  for i, v in ipairs(data) do
+    sum = sum + math.pow(v - avg, 2)
+  end
 
-	return sum / #data
+  return sum / #data
 end
 
 -- 计算向量合
 function lso.math.getMag(...)
-	local vec = {...}
-	local sum = 0
-	if (#vec == 0) then
-		return sum
-	end
-	if (type(vec[1]) == "table") then
-		vec = vec[1]
-	end
-	for i, v in pairs(vec) do
-		sum = sum + math.pow(v, 2)
+  local vec = {...}
+  local sum = 0
+  if (#vec == 0) then
+    return sum
   end
-	return math.sqrt(sum)
+  if (type(vec[1]) == "table") then
+    vec = vec[1]
+  end
+  for i, v in pairs(vec) do
+    sum = sum + math.pow(v, 2)
+  end
+  return math.sqrt(sum)
 end
 
 -- 计算向量点积
 function lso.math.getDP(vec1, vec2)
-	return vec1.x*vec2.x + vec1.y*vec2.y + vec1.z*vec2.z
+  return vec1.x*vec2.x + vec1.y*vec2.y + vec1.z*vec2.z
 end
 
 -- 计算向量交叉乘积
 function lso.math.getCP(vec1, vec2)
-	return { x = vec1.y*vec2.z - vec1.z*vec2.y, y = vec1.z*vec2.x - vec1.x*vec2.z, z = vec1.x*vec2.y - vec1.y*vec2.x}
+  return { x = vec1.y*vec2.z - vec1.z*vec2.y, y = vec1.z*vec2.x - vec1.x*vec2.z, z = vec1.x*vec2.y - vec1.y*vec2.x}
 end
 
 
 lso.process = {}
 lso.process.currentStatus = {}
 lso.process.Status = Enum(
-	"NONE",
-	"CHECK_IN",
-	"IN_SIGHT",
-	"INITIAL",
-	"BREAK",
-	"PADDLES",
-	"DEPART"
+  "NONE",
+  "CHECK_IN",
+  "IN_SIGHT",
+  "INITIAL",
+  "BREAK",
+  "PADDLES",
+  "DEPART"
 )
 function lso.process.changeStatus(unit, newStatus)
-	lso.process.currentStatus[unit:getName()] = newStatus
+  lso.process.currentStatus[unit:getName()] = newStatus
 end
 function lso.process.getStatus(unit)
-	return lso.process.currentStatus[unit:getName()]
+  return lso.process.currentStatus[unit:getName()]
 end
 function lso.process.initPlane(unit)
 	local plane = lso.Plane.get(unit)
@@ -1643,8 +1643,8 @@ function lso.process.initPlane(unit)
 	lso.Menu:initMenu(unit)
 end
 function lso.process.removePlane(unit)
-	lso.Carrier:removePlane(plane)
-	lso.process.changeStatus(unit, nil)
+  lso.Carrier:removePlane(plane)
+  lso.process.changeStatus(unit, nil)
 end
 function lso.process.getUnitsInStatus(status)
 	local units = {}
@@ -1904,70 +1904,70 @@ lso.Marshal.needInformation = false -- 需要播报航母信息
 lso.Marshal.queue = {} -- 待处理事项队列
 lso.Marshal.lowFuel = lso.math.random(1, 2, true)
 function lso.Marshal:coolDown(cdTime)
-	self.coolDownTime = timer.getTime() + cdTime
+  self.coolDownTime = timer.getTime() + cdTime
 end
 function lso.Marshal:isCoolDown()
-	return timer.getTime() > self.coolDownTime
+  return timer.getTime() > self.coolDownTime
 end
 function lso.Marshal:checkIn(unit)
-	local unitName = unit:getName()
-	if (lso.utils.listContains(self.check, unitName)) then
-		return false
-	else
-		table.insert(self.check, unitName)
-		return true
-	end
+  local unitName = unit:getName()
+  if (lso.utils.listContains(self.check, unitName)) then
+    return false
+  else
+    table.insert(self.check, unitName)
+    return true
+  end
 end
 
 function lso.Marshal:inSight(unit)
-	local unitName = unit:getName()
-	if (lso.utils.listContains(self.visual, unitName)) then
-		return false
-	else
-		table.insert(self.visual, unitName)
-		return true
-	end
+  local unitName = unit:getName()
+  if (lso.utils.listContains(self.visual, unitName)) then
+    return false
+  else
+    table.insert(self.visual, unitName)
+    return true
+  end
 end
 
 function lso.Marshal:offerInformation()
-	if (self.needInformation == false) then
-		self.needInformation = true
-		table.insert(self.queue, function(timestamp)
-			local eat = lso.Carrier:getEAT()
-			local charlieTime = (lso.Carrier.recovery == true or eat == nil) and "" or string.format(", Expected Charlie time %d", math.ceil((eat - timer.getTime()) / 60))
-			local temperature, pressure = lso.Carrier:getTemperatureAndPressure()
-			local information
-			if (lso.Carrier.turning) then
-				local nextBRC = lso.Carrier:getBRC()
-				information = string.format("99, Mother is turning, expected BRC is %03d, Altimeter %.2f%s.", nextBRC, pressure, charlieTime)
-			else
-				local brc = lso.Carrier:getBRC(true)
-				information = string.format("99, Mother's BRC is %03d, Altimeter %.2f%s.", brc, pressure, charlieTime)
-			end
-			local radio = lso.RadioCommand:new("mather_information", "Marshal", information, nil, 4, lso.RadioCommand.Priority.NORMAL, 8)
-			radio:send()
-			self:coolDown(radio:getDuration())
-			self.needInformation = false
-		end)
-	end
+  if (self.needInformation == false) then
+    self.needInformation = true
+    table.insert(self.queue, function(timestamp)
+        local eat = lso.Carrier:getEAT()
+        local charlieTime = (lso.Carrier.recovery == true or eat == nil) and "" or string.format(", Expected Charlie time %d", math.ceil((eat - timer.getTime()) / 60))
+        local temperature, pressure = lso.Carrier:getTemperatureAndPressure()
+        local information
+        if (lso.Carrier.turning) then
+          local nextBRC = lso.Carrier:getBRC()
+          information = string.format("99, Mother is turning, expected BRC is %03d, Altimeter %.2f%s.", nextBRC, pressure, charlieTime)
+        else
+          local brc = lso.Carrier:getBRC(true)
+          information = string.format("99, Mother's BRC is %03d, Altimeter %.2f%s.", brc, pressure, charlieTime)
+        end
+        local radio = lso.RadioCommand:new("mather_information", "Marshal", information, nil, 4, lso.RadioCommand.Priority.NORMAL, 8)
+        radio:send()
+        self:coolDown(radio:getDuration())
+        self.needInformation = false
+      end)
+  end
 end
 -- 广播航母开始转向或停止转向
 function lso.Marshal:startOrStopTurning(event)
-	if (event == lso.Broadcast.event.TURNING_START) then
-		table.insert(self.queue, function(timestamp)
-			local nextBRC = lso.Carrier:getBRC()
-			local radio = lso.RadioCommand:new("turning", "Marshal", string.format("99, Mother start turning, Expected BRC is %03d.", nextBRC), nil, 3, lso.RadioCommand.Priority.NORMAL)
-			radio:send()
-			self:coolDown(radio:getDuration())
-		end)
-	elseif (event == lso.Broadcast.event.TURNING_STOP) then
-		table.insert(self.queue, function(timestamp)
-			local brc = lso.Carrier:getBRC(true)
-			local radio = lso.RadioCommand:new("turning", "Marshal", string.format("99, Mother's new BRC is %03d.", brc), nil, 3, lso.RadioCommand.Priority.NORMAL)
-			radio:send()
-			self:coolDown(radio:getDuration())
-		end)
-	end
+  if (event == lso.Broadcast.event.TURNING_START) then
+    table.insert(self.queue, function(timestamp)
+        local nextBRC = lso.Carrier:getBRC()
+        local radio = lso.RadioCommand:new("turning", "Marshal", string.format("99, Mother start turning, Expected BRC is %03d.", nextBRC), nil, 3, lso.RadioCommand.Priority.NORMAL)
+        radio:send()
+        self:coolDown(radio:getDuration())
+      end)
+  elseif (event == lso.Broadcast.event.TURNING_STOP) then
+    table.insert(self.queue, function(timestamp)
+        local brc = lso.Carrier:getBRC(true)
+        local radio = lso.RadioCommand:new("turning", "Marshal", string.format("99, Mother's new BRC is %03d.", brc), nil, 3, lso.RadioCommand.Priority.NORMAL)
+        radio:send()
+        self:coolDown(radio:getDuration())
+      end)
+  end
 end
 -- 广播航母开始回收或停止回收作业
 function lso.Marshal:startOrStopRecovery(event)
@@ -2099,13 +2099,13 @@ function lso.Marshal:process()
 	end
 end
 function lso.Marshal:onFrame()
-	if (self:isCoolDown() and lso.LSO.contact ~= true) then
-		self:process()
-		if (#self.queue > 0) then
-			local func = table.remove(self.queue, 1)
-			func(timer.getTime())
-		end
-	end
+  if (self:isCoolDown() and lso.LSO.contact ~= true) then
+    self:process()
+    if (#self.queue > 0) then
+      local func = table.remove(self.queue, 1)
+      func(timer.getTime())
+    end
+  end
 end
 
 
@@ -2117,13 +2117,13 @@ lso.Tower.monitoring = {} -- 雷达监控中的单位
 lso.Tower.coolDownTime = 0
 
 function lso.Tower:checkIn(unit)
-	local unitName = unit:getName()
-	if (lso.utils.listContains(self.monitoring, unitName)) then
-		return false
-	else
-		table.insert(self.monitoring, unitName)
-		return true
-	end
+  local unitName = unit:getName()
+  if (lso.utils.listContains(self.monitoring, unitName)) then
+    return false
+  else
+    table.insert(self.monitoring, unitName)
+    return true
+  end
 end
 function lso.Tower:onFrame()
 	if (timer.getTime() > self.coolDownTime) then
@@ -2248,16 +2248,16 @@ lso.LSO = {}
 lso.LSO.contact = false -- 是否在指挥
 
 lso.LSO.Result = Enum(
-	"LAND",
-	"BOLTER",
-	"WAVEOFF"
+  "LAND",
+  "BOLTER",
+  "WAVEOFF"
 )
 lso.LSO.Grade = Enum(
-	"OK_UNDERLINE",
-	"OK",
-	"FAIR",
-	"NO_GRADE",
-	"CUT"
+  "OK_UNDERLINE",
+  "OK",
+  "FAIR",
+  "NO_GRADE",
+  "CUT"
 )
 lso.LSO.Cause = Enum(
 	"LONG", -- long in the groove
@@ -2295,61 +2295,61 @@ lso.LSO.command = {
 
 -- 着舰信号官指令记录
 lso.LSO.commands = {
-	currentCommand = nil, -- 当前指令
-	sendTime = nil, -- 当前指令下达时间
-	coolDown = {}, -- 指令冷却状态
+  currentCommand = nil, -- 当前指令
+  sendTime = nil, -- 当前指令下达时间
+  coolDown = {}, -- 指令冷却状态
 }
 
 -- 下达指令
 function lso.LSO:showCommand(cmd, speaker, force, data)
-	local commandData = self.commands
-	local nowTime = timer.getTime()
-	
-	-- 检查上一条指令是否结束
-	-- 当上一条指令已结束或新指令优先级高于上一条指令时，将上一条指令设置冷却，并继续执行
-	-- 否则忽略新指令
-	if ((not force) and commandData.currentCommand and commandData.sendTime) then
-		local prior = cmd.priority > commandData.currentCommand.priority
-		local endTime = commandData.sendTime + commandData.currentCommand:getDuration()
-		if (prior or nowTime >= endTime) then
-			local cd = commandData.coolDown or {}
-			cd[commandData.currentCommand.tag] = {
-				command = commandData.currentCommand,
-				coolTime = endTime + 4
-			}
-			commandData.coolDown = cd
-			commandData.sendTime = nil
-			commandData.currentCommand = nil
-			self.commands = commandData
-		else
-			return false
-		end
-	end
+  local commandData = self.commands
+  local nowTime = timer.getTime()
 
-	-- 更新所有指令的冷却状态
-	-- 并检查新指令是否处于冷却期
-	local cooling = false
-	for tag, cdItem in pairs(commandData.coolDown) do
-		if (nowTime >= cdItem.coolTime) then
-			commandData.coolDown[tag] = nil
-		else
-			if (cdItem.command == cmd) then
-				cooling = true
-			end
-		end
-	end
-	self.commands = commandData
+  -- 检查上一条指令是否结束
+  -- 当上一条指令已结束或新指令优先级高于上一条指令时，将上一条指令设置冷却，并继续执行
+  -- 否则忽略新指令
+  if ((not force) and commandData.currentCommand and commandData.sendTime) then
+    local prior = cmd.priority > commandData.currentCommand.priority
+    local endTime = commandData.sendTime + commandData.currentCommand:getDuration()
+    if (prior or nowTime >= endTime) then
+      local cd = commandData.coolDown or {}
+      cd[commandData.currentCommand.tag] = {
+        command = commandData.currentCommand,
+        coolTime = endTime + 4
+      }
+      commandData.coolDown = cd
+      commandData.sendTime = nil
+      commandData.currentCommand = nil
+      self.commands = commandData
+    else
+      return false
+    end
+  end
 
-	-- 如果新指令未处于冷却期或新指令优先级为“立即执行”，则下达新指令
-	if ((not force) and cooling and cmd.priority ~= lso.RadioCommand.Priority.IMMEDIATELY) then
-		return false
-	else
-		commandData.currentCommand = cmd
-		commandData.sendTime = nowTime
-		self.commands = commandData
-		cmd:send(speaker, data)
-		return true
-	end
+  -- 更新所有指令的冷却状态
+  -- 并检查新指令是否处于冷却期
+  local cooling = false
+  for tag, cdItem in pairs(commandData.coolDown) do
+    if (nowTime >= cdItem.coolTime) then
+      commandData.coolDown[tag] = nil
+    else
+      if (cdItem.command == cmd) then
+        cooling = true
+      end
+    end
+  end
+  self.commands = commandData
+
+  -- 如果新指令未处于冷却期或新指令优先级为“立即执行”，则下达新指令
+  if ((not force) and cooling and cmd.priority ~= lso.RadioCommand.Priority.IMMEDIATELY) then
+    return false
+  else
+    commandData.currentCommand = cmd
+    commandData.sendTime = nowTime
+    self.commands = commandData
+    cmd:send(speaker, data)
+    return true
+  end
 end
 
 
@@ -2357,79 +2357,79 @@ end
 -- 用于记录着陆阶段所有飞行数据
 lso.LSO.TrackData = {__class="TrackData", plane, data, commands, processTime}
 function lso.LSO.TrackData:new(plane)
-	assert(plane ~= nil, "TrackData: unit cannot be nil");
-	local obj = {
-		plane = plane,
-		data = {},
-		commands = {},
-		processTime = {
-			start,ball,middle,close,ramp,
-		},
-	}
-	setmetatable(obj, {__index = self})
-	return obj
+  assert(plane ~= nil, "TrackData: unit cannot be nil");
+  local obj = {
+    plane = plane,
+    data = {},
+    commands = {},
+    processTime = {
+      start,ball,middle,close,ramp,
+    },
+  }
+  setmetatable(obj, {__index = self})
+  return obj
 end
 function lso.LSO.TrackData:track(timestamp)
-	local plane = self.plane
-	-- 记录新的飞行数据
-	local flightData = {
-		heading = plane.heading, -- 飞机航向（北修正）（角度值）
-		distance = plane.distance, -- 到航母平面距离（m）
-		rtg = plane.rtg, -- RangeToGo（m）
-		angleError = plane.angleError, -- lineup偏差(左正右负)（角度值）
-		gs = plane.gs, -- 飞机当前所处下滑道位置（相对着舰点）（角度值）
-		gsError = plane.gsError, -- 飞机当前所处下滑道偏差（高正低负）（角度值）
-		aoa = plane.aoa, -- 迎角（角度值）
-		roll = plane.roll, -- 滚转角（角度值）
-		atltitude = plane.point.y, -- 高度（m）
-		speed = plane.speed, -- 示空速（m/s）
-		vs = plane.vs, -- 垂直速度（m/s）
-		fuel = plane.fuel, -- 燃油余量 (kg)
-		timestamp = timestamp or timer.getTime(), -- 数据记录时间戳（ModelTime）（秒）
-	}
-	table.insert(self.data, flightData)
+  local plane = self.plane
+  -- 记录新的飞行数据
+  local flightData = {
+    heading = plane.heading, -- 飞机航向（北修正）（角度值）
+    distance = plane.distance, -- 到航母平面距离（m）
+    rtg = plane.rtg, -- RangeToGo（m）
+    angleError = plane.angleError, -- lineup偏差(左正右负)（角度值）
+    gs = plane.gs, -- 飞机当前所处下滑道位置（相对着舰点）（角度值）
+    gsError = plane.gsError, -- 飞机当前所处下滑道偏差（高正低负）（角度值）
+    aoa = plane.aoa, -- 迎角（角度值）
+    roll = plane.roll, -- 滚转角（角度值）
+    atltitude = plane.point.y, -- 高度（m）
+    speed = plane.speed, -- 示空速（m/s）
+    vs = plane.vs, -- 垂直速度（m/s）
+    fuel = plane.fuel, -- 燃油余量 (kg)
+    timestamp = timestamp or timer.getTime(), -- 数据记录时间戳（ModelTime）（秒）
+  }
+  table.insert(self.data, flightData)
 end
 function lso.LSO.TrackData:getData(timestamp)
-	if (#self.data > 0) then
-		if (type(timestamp) == "number") then
-			local dt = nil
-			local data = nil
-			for i, item in ipairs(self.data) do
-				local newDt = math.abs(timestamp - item.timestamp)
-				if (data == nil or newDt <= dt) then
-					data = item
-					dt = newDt
-				elseif (newDt > dt) then
-					break
-				end
-			end
-			return data
-		else
-			return self.data[#self.data]
-		end
-	else
-		return nil
-	end
+  if (#self.data > 0) then
+    if (type(timestamp) == "number") then
+      local dt = nil
+      local data = nil
+      for i, item in ipairs(self.data) do
+        local newDt = math.abs(timestamp - item.timestamp)
+        if (data == nil or newDt <= dt) then
+          data = item
+          dt = newDt
+        elseif (newDt > dt) then
+          break
+        end
+      end
+      return data
+    else
+      return self.data[#self.data]
+    end
+  else
+    return nil
+  end
 end
 function lso.LSO.TrackData:getDataRecord(dataType, length, timestamp)
-	length = (type(length) == "number" and length <= #self.data) and length or #self.data
-	local tmp = {}
-	for i = #self.data, #self.data - length + 1, -1 do
-		if (self.data[i][dataType] ~= nil and (timestamp == nil or self.data[i].timestamp <= timestamp)) then
-			table.insert(tmp, self.data[i][dataType])
-		end
-	end
-	local data = {}
-	for i = 1, #tmp do
-		data[i] = table.remove(tmp)
-	end
-	return data
+  length = (type(length) == "number" and length <= #self.data) and length or #self.data
+  local tmp = {}
+  for i = #self.data, #self.data - length + 1, -1 do
+    if (self.data[i][dataType] ~= nil and (timestamp == nil or self.data[i].timestamp <= timestamp)) then
+      table.insert(tmp, self.data[i][dataType])
+    end
+  end
+  local data = {}
+  for i = 1, #tmp do
+    data[i] = table.remove(tmp)
+  end
+  return data
 end
 function lso.LSO.TrackData:addCommand(command, timestamp)
-	table.insert(self.commands, {
-		command = command,
-		timestamp = timestamp or timer.getTime()
-	})
+  table.insert(self.commands, {
+      command = command,
+      timestamp = timestamp or timer.getTime()
+    })
 end
 
 
@@ -2842,67 +2842,67 @@ end
 -- 全局事件处理器
 lso.eventHandler = {}
 function lso.eventHandler:onEvent(event)
-	local status, err = pcall(function(event)
-        if event == nil or event.initiator == nil then
-            return false
+  local status, err = pcall(function(event)
+      if event == nil or event.initiator == nil then
+        return false
+      end
+      if (
+        world.event.S_EVENT_BIRTH == event.id
+        ) then
+        if (event.initiator:getPlayerName()) then
+          lso.process.initPlane(event.initiator)
         end
-		if (
-			world.event.S_EVENT_BIRTH == event.id
-			) then
-			if (event.initiator:getPlayerName()) then
-				lso.process.initPlane(event.initiator)
-			end
-        end
-		-- if (
-			-- world.event.S_EVENT_LAND == event.id
-			-- ) then
-			-- lso.process.initPlane(event.initiator)
-			-- if event.place == lso.Carrier.unit then
-				-- mist.message.add({
-					-- text = "着舰",
-					-- displayTime = 5,
-					-- msgFor = {units={event.initiator:getName()}},
-					-- name = event.initiator:getName() .. "donedone",
-				-- })
-			-- end
-        -- end
-		-- if (
-			-- world.event.S_EVENT_CRASH == event.id
-			-- or world.event.S_EVENT_EJECTION == event.id
-			-- or world.event.S_EVENT_DEAD == event.id
-			-- or world.event.S_EVENT_PILOT_DEAD == event.id
-			-- ) then
-			-- lso.process.removePlane(event.initiator)
-        -- end
-		return true
+      end
+      -- if (
+      -- world.event.S_EVENT_LAND == event.id
+      -- ) then
+      -- lso.process.initPlane(event.initiator)
+      -- if event.place == lso.Carrier.unit then
+      -- mist.message.add({
+      -- text = "着舰",
+      -- displayTime = 5,
+      -- msgFor = {units={event.initiator:getName()}},
+      -- name = event.initiator:getName() .. "donedone",
+      -- })
+      -- end
+      -- end
+      -- if (
+      -- world.event.S_EVENT_CRASH == event.id
+      -- or world.event.S_EVENT_EJECTION == event.id
+      -- or world.event.S_EVENT_DEAD == event.id
+      -- or world.event.S_EVENT_PILOT_DEAD == event.id
+      -- ) then
+      -- lso.process.removePlane(event.initiator)
+      -- end
+      return true
     end, event)
-    if (not status) then
-        env.error("Error while handling event")
-    end
+  if (not status) then
+    env.error("Error while handling event")
+  end
 end
 
 -- 初始化函数
 function lso.init()
-	if (not lso.Carrier:init()) then
-		error("Carrier not ready.")
-		-- error(carrier.unit, string.format("Carrier not ready. unsupported carrier type <%s>.", typeName))
-	end
-	lso.DB.init() -- 初始化数据库
-	-- lso.mainProcess = lso.addCheckFrame(lso) -- 添加主检测帧程序
-	lso.Carrier.frameID = lso.addCheckFrame(lso.Carrier) -- 添加航母检测帧程序
-	lso.Marshal:init() -- 初始化 Marshal 模块
-	lso.Tower.frameID = lso.addCheckFrame(lso.Tower) -- 添加 Tower 检测帧程序
+  if (not lso.Carrier:init()) then
+    error("Carrier not ready.")
+    -- error(carrier.unit, string.format("Carrier not ready. unsupported carrier type <%s>.", typeName))
+  end
+  lso.DB.init() -- 初始化数据库
+  -- lso.mainProcess = lso.addCheckFrame(lso) -- 添加主检测帧程序
+  lso.Carrier.frameID = lso.addCheckFrame(lso.Carrier) -- 添加航母检测帧程序
+  lso.Marshal:init() -- 初始化 Marshal 模块
+  lso.Tower.frameID = lso.addCheckFrame(lso.Tower) -- 添加 Tower 检测帧程序
 
-	world.addEventHandler(lso.eventHandler)
-	
-	-- 遍历初始化所有飞机状态
-	for unitName, plane in pairs(lso.DB.planes) do
-		if (plane:updateData()) then
-			lso.process.initPlane(plane.unit)
-		end
-	end
-	
-	trigger.action.outText("Smart-LSO script loaded successfully.", 5)
+  world.addEventHandler(lso.eventHandler)
+
+  -- 遍历初始化所有飞机状态
+  for unitName, plane in pairs(lso.DB.planes) do
+    if (plane:updateData()) then
+      lso.process.initPlane(plane.unit)
+    end
+  end
+
+  trigger.action.outText("Smart-LSO script loaded successfully.", 5)
 end
 
 
