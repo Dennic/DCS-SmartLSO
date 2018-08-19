@@ -242,19 +242,17 @@ lso.Broadcast.event = Enum(
 	"TURNING_STOP",
 	"RECOVERY_START",
 	"RECOVERY_STOP",
-	"EMERGENCY"
+	"EMERGENCY",
+	"TRACK_FINISH"
 )
 lso.Broadcast.listeners = {}
 lso.Broadcast.queue = {}
-function lso.Broadcast:send(event, data, timestamp)
+function lso.Broadcast:send(event, ...)
 	if event then
-		if not timestamp then
-			timestamp = timer.getTime()
-		end
 		table.insert(self.queue, {
 			event = event,
-			data = data,
-			timestamp = timestamp
+			data = {...},
+			timestamp = timer.getTime()
 		})
 	end
 end
@@ -296,7 +294,7 @@ function lso.Broadcast.loop(args, timestamp)
 		local item = table.remove(lso.Broadcast.queue, 1)
 		for i, listener in ipairs(lso.Broadcast.listeners) do
 			if (listener.events == item.event) then
-				listener.callback(item.event, item.data, item.timestamp)
+				listener.callback(item.event, item.timestamp, unpack(item.data))
 			end
 		end
 	end
@@ -1642,7 +1640,7 @@ function lso.process.initPlane(unit)
 		lso.Carrier:removePlane(plane)
 	end
 	lso.process.changeStatus(unit, lso.process.Status.NONE)
-	lso.menu.initMenu(unit)
+	lso.Menu:initMenu(unit)
 end
 function lso.process.removePlane(unit)
 	lso.Carrier:removePlane(plane)
@@ -1671,8 +1669,8 @@ function lso.process.getUnitsInStatus(status)
 end
 
 
-lso.menu = {}
-lso.menu.Command = {
+lso.Menu = {}
+lso.Menu.Command = {
 	CHECK_IN	= {text="Check in", handler="checkIn"},
 	IN_SIGHT	= {text="In Sight", handler="inSight"},
 	INFO 		= {text="Information", handler="information"},
@@ -1680,77 +1678,110 @@ lso.menu.Command = {
 	DEPART 		= {text="Depart", handler="depart"},
 	ABORT 		= {text="Abort", handler="abort"},
 }
-lso.menu.order = {
-	[1] = lso.menu.Command.CHECK_IN,
-	[2] = lso.menu.Command.IN_SIGHT,
-	[3] = lso.menu.Command.INFO,
-	[4] = lso.menu.Command.EMERGENCY,
-	[5] = lso.menu.Command.DEPART,
-	[6] = lso.menu.Command.ABORT,
+lso.Menu.order = {
+	[1] = lso.Menu.Command.CHECK_IN,
+	[2] = lso.Menu.Command.IN_SIGHT,
+	[3] = lso.Menu.Command.INFO,
+	[4] = lso.Menu.Command.EMERGENCY,
+	[5] = lso.Menu.Command.DEPART,
+	[6] = lso.Menu.Command.ABORT,
 }
-lso.menu.path = {}
-function lso.menu.addMenu(unit, menu, handler)
-	if (lso.menu.path[unit:getName()] == nil) then
-		lso.menu.path[unit:getName()] = {}
+lso.Menu.path = {}
+function lso.Menu:registerMenu(tag, text, handler, order)
+	assert(type(tag) == "string", string.format("bad argument #1 (tag) to 'lso.Menu:registerMenu' (string expected, got %s)", type(tag)))
+	assert(type(text) == "string", string.format("bad argument #2 (text) to 'lso.Menu:registerMenu' (string expected, got %s)", type(text)))
+	assert(type(handler) == "function", string.format("bad argument #3 (handler) to 'lso.Menu:registerMenu' (function expected, got %s)", type(handler)))
+	assert(order == nil or type(order) == "number", string.format("bad argument #4 (order) to 'lso.Menu:registerMenu' (number expected, got %s)", type(order)))
+	assert(self.Command[tag] == nil, string.format("Fail to register menu (Tag \"%s\"already exist).", tag))
+	self.Command[tag] = {text=text, handler=handler}
+	table.insert(self.order, order or 1, self.Command[tag])
+end
+function lso.Menu:addMenu(unit, menu, handler)
+	if (unit.__class == "Plane") then
+		unit = unit.unit
 	end
-	if (lso.menu.path[unit:getName()][menu.text] == nil) then
-		lso.menu.clearMenu(unit)
-		for i, m in ipairs(lso.menu.order) do
-			if (lso.menu.hasMenu(unit, m)) then
-				local mData = lso.menu.getMenu(unit, m)
-				lso.menu.path[unit:getName()][m.text].path = missionCommands.addCommandForGroup(unit:getGroup():getID(), m.text, nil, mData.handler, unit:getName())
-			elseif (m == menu) then
-				if not (handler) then
-					handler = lso.menu.handler[menu.handler]
-				end
-				lso.menu.path[unit:getName()][menu.text] = {
-					path = missionCommands.addCommandForGroup(unit:getGroup():getID(), menu.text, nil, handler, unit:getName()),
-					handler = handler,
-				}
+	if (lso.Menu.path[unit:getName()] == nil) then
+		lso.Menu.path[unit:getName()] = {}
+	end
+	if (lso.Menu.path[unit:getName()][menu.text] == nil) then
+		if not (handler) then
+			if type(menu.handler) == "string" then
+				handler = lso.Menu.handler[menu.handler]
+			elseif type(menu.handler) == "function" then
+				handler = menu.handler
 			end
 		end
+		if type(handler) == "function" then
+			lso.Menu:clearMenu(unit)
+			for i, m in ipairs(lso.Menu.order) do
+				if (lso.Menu:hasMenu(unit, m)) then
+					local mData = lso.Menu:getMenu(unit, m)
+					lso.Menu.path[unit:getName()][m.text].path = missionCommands.addCommandForGroup(unit:getGroup():getID(), m.text, nil, mData.handler, unit:getName())
+				elseif (m == menu) then
+					lso.Menu.path[unit:getName()][menu.text] = {
+						path = missionCommands.addCommandForGroup(unit:getGroup():getID(), menu.text, nil, handler, unit:getName()),
+						handler = handler,
+					}
+				end
+			end
+			return true
+		end
+	end
+	return false
+end
+function lso.Menu:removeMenu(unit, menu)
+	if (unit.__class == "Plane") then
+		unit = unit.unit
+	end
+	if (lso.Menu.path[unit:getName()] == nil) then
+		lso.Menu.path[unit:getName()] = {}
+	end
+	if (lso.Menu.path[unit:getName()][menu.text] ~= nil) then
+		missionCommands.removeItemForGroup(unit:getGroup():getID(), lso.Menu.path[unit:getName()][menu.text].path)
+		lso.Menu.path[unit:getName()][menu.text] = nil
 		return true
 	else
 		return false
 	end
 end
-function lso.menu.removeMenu(unit, menu)
-	if (lso.menu.path[unit:getName()] == nil) then
-		lso.menu.path[unit:getName()] = {}
+function lso.Menu:getMenu(unit, menu)
+	if (unit.__class == "Plane") then
+		unit = unit.unit
 	end
-	if (lso.menu.path[unit:getName()][menu.text] ~= nil) then
-		missionCommands.removeItemForGroup(unit:getGroup():getID(), lso.menu.path[unit:getName()][menu.text].path)
-		lso.menu.path[unit:getName()][menu.text] = nil
-		return true
-	else
-		return false
+	if (lso.Menu.path[unit:getName()] == nil) then
+		lso.Menu.path[unit:getName()] = {}
 	end
+	return lso.Menu.path[unit:getName()][menu.text]
 end
-function lso.menu.getMenu(unit, menu)
-	if (lso.menu.path[unit:getName()] == nil) then
-		lso.menu.path[unit:getName()] = {}
+function lso.Menu:hasMenu(unit, menu)
+	if (unit.__class == "Plane") then
+		unit = unit.unit
 	end
-	return lso.menu.path[unit:getName()][menu.text]
-end
-function lso.menu.hasMenu(unit, menu)
-	if (lso.menu.path[unit:getName()] == nil) then
-		lso.menu.path[unit:getName()] = {}
+	if (lso.Menu.path[unit:getName()] == nil) then
+		lso.Menu.path[unit:getName()] = {}
 	end
-	return lso.menu.path[unit:getName()][menu.text] ~= nil
+	return lso.Menu.path[unit:getName()][menu.text] ~= nil
 end
-function lso.menu.initMenu(unit)
-	lso.menu.clearMenu(unit)
-	lso.menu.path[unit:getName()] = {}
-	lso.menu.addMenu(unit, lso.menu.Command.CHECK_IN, lso.menu.handler.checkIn)
+function lso.Menu:initMenu(unit)
+	if (unit.__class == "Plane") then
+		unit = unit.unit
+	end
+	lso.Menu:clearMenu(unit)
+	lso.Menu.path[unit:getName()] = {}
+	lso.Menu:addMenu(unit, lso.Menu.Command.CHECK_IN, lso.Menu.handler.checkIn)
 end
-function lso.menu.clearMenu(unit)
+function lso.Menu:clearMenu(unit)
+	if (unit.__class == "Plane") then
+		unit = unit.unit
+	end
 	missionCommands.removeItemForGroup(unit:getGroup():getID())
 end
 
-lso.menu.handler = {}
-function lso.menu.handler.checkIn(unitName)
+-- 默认菜单处理器
+lso.Menu.handler = {}
+function lso.Menu.handler.checkIn(unitName)
 	local unit = Unit.getByName(unitName)
-	if (not lso.menu.hasMenu(unit, lso.menu.Command.CHECK_IN)) then
+	if (not lso.Menu:hasMenu(unit, lso.Menu.Command.CHECK_IN)) then
 		return
 	end
 	-- local plane = lso.Plane.get(unit)
@@ -1772,9 +1803,9 @@ function lso.menu.handler.checkIn(unitName)
 		end
 	end
 end
-function lso.menu.handler.inSight(unitName)
+function lso.Menu.handler.inSight(unitName)
 	local unit = Unit.getByName(unitName)
-	if (not lso.menu.hasMenu(unit, lso.menu.Command.IN_SIGHT)) then
+	if (not lso.Menu:hasMenu(unit, lso.Menu.Command.IN_SIGHT)) then
 		return
 	end
 	if (lso.process.getStatus(unit) == lso.process.Status.CHECK_IN) then
@@ -1790,9 +1821,9 @@ function lso.menu.handler.inSight(unitName)
 		end
 	end
 end
-function lso.menu.handler.information(unitName)
+function lso.Menu.handler.information(unitName)
 	local unit = Unit.getByName(unitName)
-	if (not lso.menu.hasMenu(unit, lso.menu.Command.INFO)) then
+	if (not lso.Menu:hasMenu(unit, lso.Menu.Command.INFO)) then
 		return
 	end
 	local plane = lso.Plane.get(unit)
@@ -1800,9 +1831,9 @@ function lso.menu.handler.information(unitName)
 		lso.Marshal:offerInformation()
 	end
 end
-function lso.menu.handler.emergency(unitName)
+function lso.Menu.handler.emergency(unitName)
 	local unit = Unit.getByName(unitName)
-	if (not lso.menu.hasMenu(unit, lso.menu.Command.EMERGENCY)) then
+	if (not lso.Menu:hasMenu(unit, lso.Menu.Command.EMERGENCY)) then
 		return
 	end
 	local plane = lso.Plane.get(unit)
@@ -1818,9 +1849,9 @@ function lso.menu.handler.emergency(unitName)
 		radio:send()
 	end
 end
-function lso.menu.handler.depart(unitName)
+function lso.Menu.handler.depart(unitName)
 	local unit = Unit.getByName(unitName)
-	if (not lso.menu.hasMenu(unit, lso.menu.Command.DEPART)) then
+	if (not lso.Menu:hasMenu(unit, lso.Menu.Command.DEPART)) then
 		return
 	end
 	local plane = lso.Plane.get(unit)
@@ -1840,9 +1871,9 @@ function lso.menu.handler.depart(unitName)
 		end
 	end
 end
-function lso.menu.handler.abort(unitName)
+function lso.Menu.handler.abort(unitName)
 	local unit = Unit.getByName(unitName)
-	if (not lso.menu.hasMenu(unit, lso.menu.Command.ABORT)) then
+	if (not lso.Menu:hasMenu(unit, lso.Menu.Command.ABORT)) then
 		return
 	end
 	local plane = lso.Plane.get(unit)
@@ -1850,12 +1881,12 @@ function lso.menu.handler.abort(unitName)
 		lso.Carrier:removePlane(plane)
 		lso.process.initPlane(unit)
 		-- lso.process.changeStatus(unit, lso.process.Status.NONE)
-		-- lso.menu.initMenu(unit)
-		-- lso.menu.removeMenu(unit, lso.menu.Command.INFO)
-		-- lso.menu.removeMenu(unit, lso.menu.Command.IN_SIGHT)
-		-- lso.menu.removeMenu(unit, lso.menu.Command.DEPART)
-		-- lso.menu.removeMenu(unit, lso.menu.Command.ABORT)
-		-- lso.menu.addMenu(unit, lso.menu.Command.CHECK_IN, lso.menu.handler.checkIn)
+		-- lso.Menu:initMenu(unit)
+		-- lso.Menu:removeMenu(unit, lso.Menu.Command.INFO)
+		-- lso.Menu:removeMenu(unit, lso.Menu.Command.IN_SIGHT)
+		-- lso.Menu:removeMenu(unit, lso.Menu.Command.DEPART)
+		-- lso.Menu:removeMenu(unit, lso.Menu.Command.ABORT)
+		-- lso.Menu:addMenu(unit, lso.Menu.Command.CHECK_IN, lso.Menu.handler.checkIn)
 		-- lso.RadioCommand:new(string.format("%s.abort", plane.number), plane.number, string.format("%s, Departing.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
 			-- :send()
 	end
@@ -1948,7 +1979,7 @@ function lso.Marshal:startOrStopRecovery(event)
 			self:coolDown(radio:getDuration())
 		end)
 		for i, unit in ipairs(units) do
-			lso.menu.removeMenu(unit, lso.menu.Command.EMERGENCY)
+			lso.Menu:removeMenu(unit, lso.Menu.Command.EMERGENCY)
 		end
 	elseif (event == lso.Broadcast.event.RECOVERY_STOP) then
 		if (#lso.Carrier.inProcess > 0) then
@@ -1962,7 +1993,7 @@ function lso.Marshal:startOrStopRecovery(event)
 			end)
 		end
 		for i, unit in ipairs(units) do
-			lso.menu.addMenu(unit, lso.menu.Command.EMERGENCY)
+			lso.Menu:addMenu(unit, lso.Menu.Command.EMERGENCY)
 		end
 	end
 end
@@ -1992,7 +2023,7 @@ function lso.Marshal:process()
 						:send()
 					self.coolDownTime = timer.getTime() + 4
 					lso.process.changeStatus(plane.unit, lso.process.Status.IN_SIGHT)
-					lso.menu.removeMenu(plane.unit, lso.menu.Command.IN_SIGHT)
+					lso.Menu:removeMenu(plane.unit, lso.Menu.Command.IN_SIGHT)
 					lso.Tower:checkIn(plane.unit)
 					table.remove(self.visual, i)
 					break
@@ -2026,12 +2057,12 @@ function lso.Marshal:process()
 					radio:send()
 					self:coolDown(radio:getDuration())
 					lso.process.changeStatus(plane.unit, lso.process.Status.CHECK_IN)
-					lso.menu.removeMenu(plane.unit, lso.menu.Command.CHECK_IN)
-					lso.menu.addMenu(plane.unit, lso.menu.Command.IN_SIGHT)
-					lso.menu.addMenu(plane.unit, lso.menu.Command.INFO)
-					lso.menu.addMenu(plane.unit, lso.menu.Command.ABORT)
+					lso.Menu:removeMenu(plane.unit, lso.Menu.Command.CHECK_IN)
+					lso.Menu:addMenu(plane.unit, lso.Menu.Command.IN_SIGHT)
+					lso.Menu:addMenu(plane.unit, lso.Menu.Command.INFO)
+					lso.Menu:addMenu(plane.unit, lso.Menu.Command.ABORT)
 					if not (lso.Carrier.recovery) then
-						lso.menu.addMenu(plane.unit, lso.menu.Command.EMERGENCY)
+						lso.Menu:addMenu(plane.unit, lso.Menu.Command.EMERGENCY)
 					end
 					table.remove(self.check, i)
 					break
@@ -2106,9 +2137,9 @@ function lso.Tower:onFrame()
 						radio:send()
 						self.coolDownTime = timer.getTime() + radio:getDuration()
 						lso.process.changeStatus(plane.unit, lso.process.Status.IN_SIGHT)
-						lso.menu.removeMenu(plane.unit, lso.menu.Command.DEPART)
+						lso.Menu:removeMenu(plane.unit, lso.Menu.Command.DEPART)
 						if not (lso.Carrier.recovery) then
-							lso.menu.addMenu(plane.unit, lso.menu.Command.EMERGENCY)
+							lso.Menu:addMenu(plane.unit, lso.Menu.Command.EMERGENCY)
 						end
 						break
 					elseif (status == lso.process.Status.BREAK) then
@@ -2144,8 +2175,8 @@ function lso.Tower:onFrame()
 													:send()
 												self.coolDownTime = timer.getTime() + 4
 												lso.process.changeStatus(plane.unit, lso.process.Status.INITIAL)
-												lso.menu.removeMenu(plane.unit, lso.menu.Command.EMERGENCY)
-												lso.menu.addMenu(plane.unit, lso.menu.Command.DEPART, lso.menu.handler.depart)
+												lso.Menu:removeMenu(plane.unit, lso.Menu.Command.EMERGENCY)
+												lso.Menu:addMenu(plane.unit, lso.Menu.Command.DEPART, lso.Menu.handler.depart)
 												break
 											end
 										end
@@ -2419,7 +2450,7 @@ function lso.LSO:checkContact(plane)
 				if (math.abs(lso.math.getAzimuthError(plane.heading, carrierTail, true)) < 45) then
 					-- 改变状态 Paddles Contact
 					lso.process.changeStatus(plane.unit, lso.process.Status.PADDLES)
-					lso.menu.removeMenu(plane.unit, lso.menu.Command.ABORT)
+					lso.Menu:removeMenu(plane.unit, lso.Menu.Command.ABORT)
 					self.command.CONTACT:send({plane.number})
 					lso.LSO:track(plane)
 					lso.LSO.contact = true
@@ -2460,13 +2491,13 @@ function lso.LSO:track(plane)
 	local goAround = function()
 		lso.LSO.contact = false
 		lso.process.changeStatus(plane.unit, lso.process.Status.BREAK)
-		lso.menu.addMenu(plane.unit, lso.menu.Command.ABORT, lso.menu.handler.abort)
+		lso.Menu:addMenu(plane.unit, lso.Menu.Command.ABORT, lso.Menu.handler.abort)
 		lso.Tower:checkIn(plane.unit)
 	end
 	local depart = function()
 		lso.LSO.contact = false
 		lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
-		lso.menu.addMenu(plane.unit, lso.menu.Command.ABORT, lso.menu.handler.abort)
+		lso.Menu:addMenu(plane.unit, lso.Menu.Command.ABORT, lso.Menu.handler.abort)
 		lso.Tower:checkIn(plane.unit)
 	end
 	local grade = function()
