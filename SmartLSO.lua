@@ -18,6 +18,7 @@ lso.carrierSpeed = 25
 
 -- 音频库
 lso.Sound = {
+<<<<<<< HEAD
   LSO = {
     PADDLES_CONTACT = "l10n/DEFAULT/paddles_contact.ogg", 
     KEEP_TURN = "l10n/DEFAULT/keep_your_turn_in.ogg", 
@@ -35,6 +36,35 @@ lso.Sound = {
     SLOW = "l10n/DEFAULT/youre_slow.ogg", 
     CENTER = "l10n/DEFAULT/youre_on_centerline.ogg", 
   }
+=======
+	RADIO			= {"l10n/DEFAULT/radio_on.ogg",				1	},
+	BOLTER 			= {"l10n/DEFAULT/bolter.ogg", 				1.7	},
+	CALL_THE_BALL 	= {"l10n/DEFAULT/call_the_ball.ogg", 		1.5	},
+	LEFT 			= {"l10n/DEFAULT/come_left.ogg", 			1.1	},
+	CUT 			= {"l10n/DEFAULT/cut.ogg", 					0.6	},
+	CLIMB 			= {"l10n/DEFAULT/dont_climb.ogg", 			1.1	},
+	SETTLE 			= {"l10n/DEFAULT/dont_settle.ogg", 			1.1	},
+	EASY 			= {"l10n/DEFAULT/easy_with_it.ogg", 		1.5	},
+	FAIR 			= {"l10n/DEFAULT/fair.ogg", 				0.6	},
+	FOUR_WIRES 		= {"l10n/DEFAULT/four_wires.ogg", 			1	},
+	KEEP_TURN 		= {"l10n/DEFAULT/keep_your_turn_in.ogg",	1.4	},
+	LIG 			= {"l10n/DEFAULT/long_in_the_groove.ogg",	3.1	},
+	NO_GRADE 		= {"l10n/DEFAULT/no_grade.ogg", 			0.7	},
+	OK 				= {"l10n/DEFAULT/ok.ogg", 					0.6	},
+	ONE_WIRE 		= {"l10n/DEFAULT/one_wire.ogg", 			0.8	},
+	PADDLES_CONTACT = {"l10n/DEFAULT/paddles_contact.ogg", 		1.5	},
+	LOW 			= {"l10n/DEFAULT/power.ogg", 				1.1	},
+	TOO_LOW 		= {"l10n/DEFAULT/power2.ogg", 				1.1	},
+	RIGHT 			= {"l10n/DEFAULT/right_for_lineup.ogg", 	1.4	}, 
+	ROGER_BALL 		= {"l10n/DEFAULT/roger_ball.ogg", 			0.9	}, 
+	THREE_WIRES 	= {"l10n/DEFAULT/three_wires.ogg", 			0.8	},
+	TWO_WIRES 		= {"l10n/DEFAULT/two_wires.ogg", 			0.8	},
+	WAVEOFF 		= {"l10n/DEFAULT/waveoff.ogg",				1.7	}, 
+	FOUL_DECK 		= {"l10n/DEFAULT/waveoff_foul_deck.ogg",	1.8	}, 
+	FAST 			= {"l10n/DEFAULT/youre_fast.ogg",			1.1	}, 
+	HIGH 			= {"l10n/DEFAULT/youre_high.ogg",			1.1	}, 
+	SLOW 			= {"l10n/DEFAULT/youre_slow.ogg",			1.3	}, 
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 }
 
 
@@ -42,6 +72,7 @@ lso.Sound = {
 -- 包含了所需的固定数据
 lso.data = {}
 lso.data.carriers = {
+<<<<<<< HEAD
   ["VINSON"] = {
     offset = {180.9, 95.2},
     height = 23,
@@ -60,6 +91,32 @@ lso.data.carriers = {
     deck = 8,
     gs = 4,
   },
+=======
+	["VINSON"] = {
+		offset = {180.9, 95.2},
+		height = 21,
+		deck = 9,
+		gs = 3.5,
+	},
+	["Stennis"] = {
+		offset = {185.01, 72.98},
+		height = 21,
+		deck = 9,
+		gs = 3.5,
+	},
+	-- ["Stennis"] = {
+		-- offset = {181.4, 92.6},
+		-- height = 21,
+		-- deck = 9,
+		-- gs = 3.5,
+	-- },
+	["KUZNECOW"] = {
+		offset = {188.67, 58.02},
+		height = 19,
+		deck = 8,
+		gs = 4,
+	},
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 }
 lso.data.aircrafts = {
   ["FA-18C_hornet"] = {
@@ -243,6 +300,7 @@ function lso.Broadcast:send(event, data, timestamp)
   end
 end
 function lso.Broadcast:remove(funcOrId)
+<<<<<<< HEAD
   local removed = false
   if funcOrId then
     if (type(funcOrId) == "number") then
@@ -294,6 +352,50 @@ function lso.Broadcast.loop(args, timestamp)
     end
   end
   return timer.getTime() + 0.005
+=======
+	local removed = false
+	if funcOrId then
+		if (type(funcOrId) == "number") then
+			for i, listener in ipairs(self.listeners) do
+				if listener.id == funcOrId then
+					table.remove(self.listeners, i)
+					removed = true
+				end
+			end
+		else
+			for i, listener in ipairs(self.listeners) do
+				if listener.callback == funcOrId then
+					table.remove(self.listeners, i)
+					removed = true
+				end
+			end
+		end
+	end
+	return removed
+end
+function lso.Broadcast:receive(events, func)
+	if (events and type(func) == "function") then
+		self.count = self.count + 1
+		local listenerId = self.count
+		table.insert(self.listeners, {
+			id = listenerId,
+			events = events,
+			callback = func
+		})
+		return listenerId
+	end
+end
+function lso.Broadcast.loop(args, timestamp)
+	while #lso.Broadcast.queue > 0 do
+		local item = table.remove(lso.Broadcast.queue, 1)
+		for i, listener in ipairs(lso.Broadcast.listeners) do
+			if (listener.events == item.event) then
+				listener.callback(item.event, item.data, item.timestamp)
+			end
+		end
+	end
+	return timer.getTime() + 0.005
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 end
 timer.scheduleFunction(lso.Broadcast.loop, nil, timer.getTime() + 1)
 
@@ -405,6 +507,7 @@ function lso.Carrier:addPlane(plane)
   end
 end
 function lso.Carrier:removePlane(plane)
+<<<<<<< HEAD
   if (lso.utils.listContains(self.inProcess, plane)) then
     lso.utils.listRemove(self.inProcess, plane)
     if (lso.carrierSailing and #self.inProcess == 0) then
@@ -421,6 +524,25 @@ function lso.Carrier:removePlane(plane)
   else
     return false
   end
+=======
+	if (lso.utils.listContains(self.inProcess, plane)) then
+		lso.utils.listRemove(self.inProcess, plane)
+		if (lso.carrierSailing and #self.inProcess == 0) then
+			local stopRecovery = function(args, timestamp)
+				if (self.recovery == true) then
+					self:addRoute(true)
+					self.recovery = false
+					self.recoveryStop = nil
+				end
+			end
+			-- 3分钟内没有新飞机加入回收队列则结束回收作业
+			self.recoveryStop = timer.scheduleFunction(stopRecovery, nil, timer.getTime() + 180)
+		end
+		return true
+	else
+		return false
+	end
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 end
 function lso.Carrier:emergency(event)
   if (lso.carrierSailing and #self.inProcess > 0 and self.recovery == false) then
@@ -459,6 +581,7 @@ function lso.Carrier:init()
   return false
 end
 function lso.Carrier:loadTasks(groupData)
+<<<<<<< HEAD
   if (lso.carrierSailing) then
     local group = self.unit:getGroup()
     if group then
@@ -489,6 +612,44 @@ function lso.Carrier:loadTasks(groupData)
     end
     self.needToTurn = true
   end
+=======
+	if (lso.carrierSailing) then
+		local group = self.unit:getGroup()
+		if group then
+			local groupCon = group:getController()
+			if groupCon then
+				local route = groupData.route
+				if (#route.points > 0) then
+					local point = route.points[1]
+					if (type(point.task) == "table" and type(point.task.params) == "table" and type(point.task.params.tasks) == "table") then
+						for i, task in pairs(point.task.params.tasks) do
+							if (task.id == "WrappedAction") then
+								local action = task.params.action
+								if (action.id == "Option") then
+									groupCon:setOption(action.params.name, action.params.value)
+								else
+									groupCon:setCommand(action)
+								end
+							end
+						end
+					end
+				end
+				local tasks = groupData.tasks
+				for i, task in pairs(tasks) do
+					if (task.id == "WrappedAction") then
+						local action = task.params.action
+						if (action.id == "Option") then
+							groupCon:setOption(action.params.name, action.params.value)
+						else
+							groupCon:setCommand(action)
+						end
+					end
+				end
+			end
+		end
+		self.needToTurn = true
+	end
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 end
 function lso.Carrier:addRoute(clearAll)
   local nowPoint = self.unit:getPoint()
@@ -667,6 +828,7 @@ function lso.Carrier:getSpeed()
   return lso.utils.getGroundSpeed(self.unit)
 end
 function lso.Carrier:onFrame()
+<<<<<<< HEAD
   -- lso.log(string.format("Case %d\ninProcess %d\nrecovery %s\nbackToCruise %s", self.case, #self.inProcess, self.recovery and "true" or "false", self.backToCruise and "true" or "false"), 1, true, "carrierFrame")
   if (self.needToTurn) then
     if (#lso.process.getUnitsInStatus({lso.process.Status.INITIAL, lso.process.Status.BREAK, lso.process.Status.PADDLES}) == 0) then
@@ -739,6 +901,80 @@ function lso.Carrier:onFrame()
       self:removePlane(plane)
     end
   end
+=======
+	-- lso.log(string.format("Case %d\ninProcess %d\nrecovery %s\nbackToCruise %s", self.case, #self.inProcess, self.recovery and "true" or "false", self.backToCruise and "true" or "false"), 1, true, "carrierFrame")
+	if (self.needToTurn) then
+		if (#lso.process.getUnitsInStatus(lso.process.Status.INITIAL + lso.process.Status.BREAK + lso.process.Status.PADDLES) == 0) then
+			if (self:addRoute()) then
+				self.needToTurn = false
+			end
+		end
+	end
+	
+	-- 检测航母是否在转向
+	local heading = lso.Carrier:getHeadding(true)
+	if (self.lastHeadding and math.abs(lso.math.getAzimuthError(heading, self.lastHeadding, true)) > 0.1) then
+	-- if (self.lastHeadding and heading ~= self.lastHeadding) then
+		if (not self.turning) then
+			self.turningTime = timer.getTime()
+		end
+		-- 转向超过 5 分钟重置路径防卡死
+		if (lso.carrierSailing and self.turningTime ~= nil and timer.getTime() - self.turningTime > 60 * 5) then
+			local group = self.unit:getGroup()
+			if group then
+				local groupCon = group:getController()
+				if groupCon then
+					groupCon:popTask()
+					self:addRoute()
+				end
+			end
+		end
+		self.turning = true
+	else
+		if (self.turning) then
+			self.turningTime = nil
+			lso.Broadcast:send(lso.Broadcast.event.TURNING_STOP)
+			if (self.recovery) then
+				lso.Broadcast:send(lso.Broadcast.event.RECOVERY_START)
+			end
+		end
+		self.turning = false
+	end
+	self.lastHeadding = heading
+	
+	-- 判断当前回收状况 Case 1-3
+	local case = 0
+	local now = lso.utils.getTime()
+	local ceiling = lso.Converter.M_FT(env.mission.weather.clouds.base)
+	local visibility = 10
+	if (env.mission.weather.enable_fog or env.mission.weather.fog.thickness > 0) then
+		visibility = lso.Converter.M_NM(env.mission.weather.fog.visibility)
+	end
+	if (now.h > 7 and now.h < 18) then
+		if (visibility >= 5) then
+			if (ceiling >= 3000) then
+				case = 1
+			elseif (ceiling >= 1000) then
+				case = 2
+			else
+				case = 3
+			end
+		else
+			case = 3
+		end
+	else
+		case = 3
+	end
+	if (case ~= 0) then
+		self.case = case
+	end
+	
+	for i, plane in ipairs(self.inProcess) do
+		if not (plane.unit:isExist()) then
+			self:removePlane(plane)
+		end
+	end
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 end
 
 
@@ -787,6 +1023,7 @@ function lso.Plane:new(unitName, aircraftData, onboardNumber)
   return obj
 end
 function lso.Plane:updateData()
+<<<<<<< HEAD
   if (self.unit and self.unit:isExist()) then
     local status, err = pcall(function()
         self.point = self.unit:getPoint()
@@ -812,6 +1049,33 @@ function lso.Plane:updateData()
   else
     return false
   end
+=======
+	if (self.unit and self.unit:isExist()) then
+		local status, err = pcall(function()
+			self.point = self.unit:getPoint()
+			self.altitude = self.point.y
+			self.heading = math.deg(lso.utils.getHeading(self.unit, true) or 0)
+			local lx, ly = lso.Carrier:getLandingPoint()
+			self.angle = lso.math.getAzimuth(self.point.z, self.point.x, lx, ly, true)
+			self.angleError = lso.Carrier:getAngleError(self.angle, true)
+			self.azimuth = (self.angle + 180 - lso.Carrier:getHeadding(true)) % 360
+			self.distance = lso.utils.getDistance(self.point.z, self.point.x, lx, ly)
+			self.rtg = self.distance * math.cos(math.rad(self.angleError))
+			self.gs = lso.Carrier:getGlideSlope(self.distance, self.point.y)
+			self.gsError = self.gs - (lso.Carrier.data.gs - lso.utils.getPitch(lso.Carrier.unit))
+			self.aoa = math.deg(lso.utils.getAoA(self.unit) or 0)
+			self.roll = math.deg(lso.utils.getRoll(self.unit) or 0)
+			self.speed = lso.utils.getIndicatedAirSpeed(self.unit) or 0
+			self.groundSpeed = lso.utils.getGroundSpeed(self.unit) or 0
+			self.vs = lso.utils.getVerticalSpeed(self.unit)
+			self.fuel = self.fuelMassMax * self.unit:getFuel()
+			self.updateTime = timer.getTime()
+		end)
+		return status
+	else
+		return false
+	end
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 end
 function lso.Plane.equalTo(self, another)
   local selfName, anotherName
@@ -855,6 +1119,7 @@ end
 
 -- RadioCommand 类
 -- 创建和发送无线电指令
+lso.radioSoundQueue = nil
 lso.RadioCommand = {__class="RadioCommand", id, sent, tag, speaker, msg, sound, duration, priority, showTime, callback}
 lso.RadioCommand.count = 0
 lso.RadioCommand.Priority = Enum(
@@ -864,6 +1129,7 @@ lso.RadioCommand.Priority = Enum(
   "IMMEDIATELY"
 )
 function lso.RadioCommand:new(tag, speaker, msg, sound, duration, priority, showTime)
+<<<<<<< HEAD
   assert(msg ~= nil, "RadioCommand: msg cannot be nil");
   self.count = self.count + 1
   local obj = {
@@ -879,6 +1145,33 @@ function lso.RadioCommand:new(tag, speaker, msg, sound, duration, priority, show
   }
   setmetatable(obj, {__index=self, __eq=self.equalTo, __tostring=self.toString, __add=self.concat, __concat=self.concat})
   return obj
+=======
+	assert(msg ~= nil, "RadioCommand: msg cannot be nil");
+	self.count = self.count + 1
+	local soundList
+	if (type(sound) == "table" and #sound > 0) then
+		if (type(sound[1]) == "table") then
+			soundList = sound
+		else
+			soundList = {sound}
+		end
+	else
+		soundList = {lso.Sound.RADIO}
+	end
+	local obj = {
+		id = self.count,
+		sent = false,
+		tag = tag or ("RadioCommand"..self.count),
+		speaker = speaker,
+		msg = msg,
+		sound = soundList,
+		duration = duration or 1,
+		priority = priority or lso.RadioCommand.Priority.NORMAL,
+		showTime = showTime or 5,
+	}
+	setmetatable(obj, {__index=self, __eq=self.equalTo, __tostring=self.toString, __add=self.concat, __concat=self.concat})
+	return obj
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 end
 function lso.RadioCommand.concat(self, another)
   if (type(another) == "table") then
@@ -926,6 +1219,7 @@ function lso.RadioCommand:prepare(speaker, data)
   return self
 end
 function lso.RadioCommand:send(speaker, data)
+<<<<<<< HEAD
   self:prepare(speaker, data)
   local unit = lso.useRadioFrequency and lso.Carrier.radio or lso.Carrier.unit
   local content = self.msg:format(unpack(self.data or {}))
@@ -954,6 +1248,57 @@ function lso.RadioCommand:send(speaker, data)
       timer.scheduleFunction(self.callback, self, timer.getTime() + self.duration)
     end
   end
+=======
+	self:prepare(speaker, data)
+	local unit = lso.useRadioFrequency and lso.Carrier.radio or lso.Carrier.unit
+	local content = self.msg:format(unpack(self.data or {}))
+	local msg = string.format("%s: %s", self.speaker or "Unknown", content)
+	local soundDuration = 0
+	for i, sound in ipairs(self.sound) do
+		soundDuration = soundDuration + sound[2]
+	end
+	if (unit and unit:isExist()) then
+		self.sent = true
+		if (lso.useRadioFrequency) then
+			local controller = unit:getController()
+			if (controller) then
+				local command = { 
+					id = 'TransmitMessage',
+					params = {
+						duration = math.max(self.showTime, soundDuration),
+						subtitle = msg,
+						loop = false,
+						file = self.sound[1][1],
+					}
+				}
+				controller:setCommand(command)
+			end
+		else
+			trigger.action.outTextForCoalition(unit:getCoalition(), msg, math.max(self.showTime, soundDuration))
+		end
+		if (lso.radioSoundQueue ~= nil) then
+			pcall(function()
+				timer.removeFunction(lso.radioSoundQueue)
+			end)
+			lso.radioSoundQueue = nil
+		end
+		local soundIndex = 2
+		local radioSound = function()
+			trigger.action.outSoundForCoalition(unit:getCoalition(), self.sound[soundIndex][1])
+			soundIndex = soundIndex + 1
+			if (soundIndex <= #self.sound) then
+				return timer.getTime() + self.sound[soundIndex][2]
+			end
+		end
+		trigger.action.outSoundForCoalition(unit:getCoalition(), self.sound[1][1])
+		if (#self.sound > 1) then
+			lso.radioSoundQueue = timer.scheduleFunction(radioSound, nil, timer.getTime() + self.sound[1][2])
+		end
+		if (self.callback) then
+			timer.scheduleFunction(self.callback, self, timer.getTime() + math.max(self.duration, soundDuration))
+		end
+	end
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 end
 
 
@@ -1228,6 +1573,7 @@ end
 
 -- 获取单位侧倾角 MIST
 function lso.utils.getRoll(unit)
+<<<<<<< HEAD
   local unitpos = unit:getPosition()
   if unitpos then
     -- now get roll:
@@ -1246,6 +1592,26 @@ function lso.utils.getRoll(unit)
     end
     return Roll
   end
+=======
+	local unitpos = unit:getPosition()
+	if unitpos then
+		-- now get roll:
+		--maybe not the best way to do it, but it works.
+		--first, make a vector that is perpendicular to y and unitpos.x with cross product
+		local cp = lso.math.getCP(unitpos.x, {x = 0, y = 1, z = 0})
+		--now, get dot product of of this cross product with unitpos.z
+		local dp = lso.math.getDP(cp, unitpos.z)
+		--now get the magnitude of the roll (magnitude of the angle between two vectors is acos(vec1.vec2/|vec1||vec2|)
+		local Roll = math.acos(dp/(lso.math.getMag(cp)*lso.math.getMag(unitpos.z)))
+		--now, have to get sign of roll.
+		-- by convention, making right roll positive
+		-- to get sign of roll, use the y component of unitpos.z.	For right roll, y component is negative.
+		if unitpos.z.y < 0 then -- right roll, flip the sign of the roll
+			Roll = -Roll
+		end
+		return Roll
+	end
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 end
 
 -- 获取单位偏航角 MIST
@@ -1299,6 +1665,7 @@ end
 
 -- 获取单位示空速 m/s
 function lso.utils.getIndicatedAirSpeed(unit)
+<<<<<<< HEAD
   if (type(unit) == "string") then
     unit = Unit.getByName(unit)
   end
@@ -1311,6 +1678,24 @@ function lso.utils.getIndicatedAirSpeed(unit)
   -- EAS = √((TAS^2)/(p0/p)/(T/T0))
   local eas = math.sqrt(math.pow(tas, 2) / (p0/p) / (t/t0))
   return eas
+=======
+	if (type(unit) == "string") then
+		unit = Unit.getByName(unit)
+	end
+	local wind = atmosphere.getWind(unit:getPoint())
+	local velocity = unit:getVelocity()
+	local windSpeed = lso.math.getDP(wind, velocity) / lso.math.getMag(velocity)
+	local tas = lso.utils.getAirSpeed(unit)
+	local point = unit:getPoint()
+	local t, p = atmosphere.getTemperatureAndPressure(point)
+	local t0 = 288.15 -- 15℃标准气温（开尔文）
+	point.y = 0
+	local tsl, p0 = atmosphere.getTemperatureAndPressure(point)
+	-- EAS = √((TAS^2)/(p0/p)/(T/T0))
+	local eas = math.sqrt(math.pow(tas, 2) / (p0/p) / (t/t0))
+	eas = eas - windSpeed
+	return math.abs(eas)
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 end
 
 -- 获取单位气压高度 m （实验）
@@ -1599,6 +1984,7 @@ function lso.process.removePlane(unit)
   lso.process.changeStatus(unit, nil)
 end
 function lso.process.getUnitsInStatus(status)
+<<<<<<< HEAD
   local units = {}
   local insert = function(unit)
     local exist = false
@@ -1621,6 +2007,27 @@ function lso.process.getUnitsInStatus(status)
     end
   end
   return units
+=======
+	local units = {}
+	local insert = function(unit)
+		local exist = false
+		for i, value in ipairs(units) do
+			if (value:getName() == unit:getName()) then
+				exist = true
+				break
+			end
+		end
+		if not exist then
+			table.insert(units, unit)
+		end
+	end
+	for unitName, currStatus in pairs(lso.process.currentStatus) do
+		if (status == currStatus) then
+			insert(Unit.getByName(unitName))
+		end
+	end
+	return units
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 end
 
 
@@ -1893,6 +2300,7 @@ function lso.Marshal:startOrStopTurning(event)
 end
 -- 广播航母开始回收或停止回收作业
 function lso.Marshal:startOrStopRecovery(event)
+<<<<<<< HEAD
   local units = lso.process.getUnitsInStatus({lso.process.Status.CHECK_IN, lso.process.Status.IN_SIGHT})
   if (event == lso.Broadcast.event.RECOVERY_START) then
     table.insert(self.queue, function(timestamp)
@@ -2019,6 +2427,134 @@ function lso.Marshal:process()
       end
     end
   end
+=======
+	local units = lso.process.getUnitsInStatus(lso.process.Status.CHECK_IN + lso.process.Status.IN_SIGHT)
+	if (event == lso.Broadcast.event.RECOVERY_START) then
+		table.insert(self.queue, function(timestamp)
+			local radio = lso.RadioCommand:new("recovery", "Marshal", "99, Charlie.", nil, 2, lso.RadioCommand.Priority.NORMAL)
+			radio:send()
+			self:coolDown(radio:getDuration())
+		end)
+		for i, unit in ipairs(units) do
+			lso.menu.removeMenu(unit, lso.menu.Command.EMERGENCY)
+		end
+	elseif (event == lso.Broadcast.event.RECOVERY_STOP) then
+		if (#lso.Carrier.inProcess > 0) then
+			table.insert(self.queue, function(timestamp)
+				local eat = lso.Carrier:getEAT()
+				if eat then
+					local radio = lso.RadioCommand:new("recovery", "Marshal", string.format("99, Expected Charlie time %d.", math.ceil((eat - timer.getTime()) / 60)), nil, 3, lso.RadioCommand.Priority.NORMAL)
+					radio:send()
+					self:coolDown(radio:getDuration())
+				end
+			end)
+		end
+		for i, unit in ipairs(units) do
+			lso.menu.addMenu(unit, lso.menu.Command.EMERGENCY)
+		end
+	end
+end
+-- 初始化 Marshal 模块
+function lso.Marshal:init()
+	self.frameID = lso.addCheckFrame(self) -- 添加 Marshal 检测帧程序
+	
+	lso.Broadcast:receive(lso.Broadcast.event.RECOVERY_START + lso.Broadcast.event.RECOVERY_STOP, function(event)
+		self:startOrStopRecovery(event)
+	end)
+	lso.Broadcast:receive(lso.Broadcast.event.TURNING_START + lso.Broadcast.event.TURNING_STOP, function(event)
+		self:startOrStopTurning(event)
+	end)
+end
+-- 处理管制飞机
+function lso.Marshal:process()
+	if (#self.queue == 0) then
+		if (#self.visual > 0) then
+			for i, unitName in pairs(self.visual) do
+				local plane = lso.Plane.get(unitName)
+				if (plane and plane:inAir() and lso.process.getStatus(plane.unit) == lso.process.Status.CHECK_IN) then
+					lso.RadioCommand:new(string.format("%s.switch_tower", plane.name), "Marshal", string.format("%s, Switch Tower.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
+						:onFinish(function()
+							lso.RadioCommand:new(string.format("%s.switch_tower_roger", plane.name), plane.number, string.format("%s, Roger, Switch Tower.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
+								:send()
+						end)
+						:send()
+					self.coolDownTime = timer.getTime() + 4
+					lso.process.changeStatus(plane.unit, lso.process.Status.IN_SIGHT)
+					lso.menu.removeMenu(plane.unit, lso.menu.Command.IN_SIGHT)
+					lso.Tower:checkIn(plane.unit)
+					table.remove(self.visual, i)
+					break
+				else
+					table.remove(self.visual, i)
+				end
+			end
+		elseif (#self.check > 0) then
+			for i, unitName in pairs(self.check) do
+				local plane = lso.Plane.get(unitName)
+				if (plane and plane:inAir()) then
+					local _, recoveryStarted = lso.Carrier:addPlane(plane)
+					local eat = lso.Carrier:getEAT()
+					local charlieTime = (recoveryStarted or eat == nil) and "" or string.format(", Expected Charlie time %d", math.ceil((eat - timer.getTime()) / 60))
+					local charlieTimeRoger = (recoveryStarted or eat == nil) and "" or string.format(", Charlie time %d", math.ceil((eat - timer.getTime()) / 60))
+					local temperature, pressure = lso.Carrier:getTemperatureAndPressure()
+					local replyMsg, rogerMsg
+					if (lso.carrierSailing and (lso.Carrier.turning or recoveryStarted)) then
+						local nextBRC = lso.Carrier:getBRC()
+						replyMsg = string.format("%s, Radar contact, Case I recovery, Expected BRC is %03d, Altimeter %.2f%s, Report see me.", plane.number, nextBRC, pressure, charlieTime)
+						rogerMsg = string.format("%s, Roger, Expected BRC %03d, %.2f%s.", plane.number, nextBRC, pressure, charlieTimeRoger)
+					else
+						local brc = lso.Carrier:getBRC(true)
+						replyMsg = string.format("%s, Radar contact, Case I recovery, BRC is %03d, Altimeter %.2f%s, Report see me.", plane.number, brc, pressure, charlieTime)
+						rogerMsg = string.format("%s, Roger, BRC %03d, %.2f%s.", plane.number, brc, pressure, charlieTimeRoger)
+					end
+					local radio = lso.RadioCommand:new(string.format("%s.check_in_reply", plane.name), "Marshal", replyMsg, nil, 4, lso.RadioCommand.Priority.NORMAL, 8)
+							:prepare()
+						+ lso.RadioCommand:new(string.format("%s.check_in_roger", plane.name), plane.number, rogerMsg, nil, 2, lso.RadioCommand.Priority.NORMAL)
+							:prepare()
+					radio:send()
+					self:coolDown(radio:getDuration())
+					lso.process.changeStatus(plane.unit, lso.process.Status.CHECK_IN)
+					lso.menu.removeMenu(plane.unit, lso.menu.Command.CHECK_IN)
+					lso.menu.addMenu(plane.unit, lso.menu.Command.IN_SIGHT)
+					lso.menu.addMenu(plane.unit, lso.menu.Command.INFO)
+					lso.menu.addMenu(plane.unit, lso.menu.Command.ABORT)
+					if not (lso.Carrier.recovery) then
+						lso.menu.addMenu(plane.unit, lso.menu.Command.EMERGENCY)
+					end
+					table.remove(self.check, i)
+					break
+				else
+					table.remove(self.check, i)
+				end
+			end
+		else
+			local units = lso.process.getUnitsInStatus(lso.process.Status.CHECK_IN + lso.process.Status.IN_SIGHT)
+			for i, unit in ipairs(units) do
+				local plane = lso.Plane.get(unit)
+				if (plane and plane.fuelLow == false) then
+					local fuelMess = lso.Converter.KG_LB(plane.fuel) / 1000
+					-- 燃油小于 1500 磅
+					if (fuelMess < self.lowFuel) then
+						plane.fuelLow = true
+						self.lowFuel = lso.math.random(1, 2, true)
+						table.insert(self.queue, function(timestamp)
+							local radio = lso.RadioCommand:new(string.format("saystate_%s", plane.name), "Marshal", string.format("%s, Say state.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
+									:prepare()
+								+ lso.RadioCommand:new(string.format("saystate_reply_%s", plane.name), plane.number, string.format("%s, State %.1f.", plane.number, fuelMess), nil, 2, lso.RadioCommand.Priority.NORMAL)
+									:prepare()
+								+ lso.RadioCommand:new(string.format("saystate_charlie_%s", plane.name), "Marshal", string.format("%s, Charlie.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
+									:prepare()
+							radio:send()
+							self:coolDown(radio:getDuration())
+							lso.Broadcast:send(lso.Broadcast.event.EMERGENCY)
+						end)
+						break
+					end
+				end
+			end
+		end
+	end
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 end
 function lso.Marshal:onFrame()
   if (self:isCoolDown() and lso.LSO.contact ~= true) then
@@ -2048,6 +2584,7 @@ function lso.Tower:checkIn(unit)
   end
 end
 function lso.Tower:onFrame()
+<<<<<<< HEAD
   if (timer.getTime() > self.coolDownTime) then
     for i, unitName in pairs(self.monitoring) do
       local plane = lso.Plane.get(unitName)
@@ -2166,6 +2703,121 @@ function lso.Tower:onFrame()
       end
     end
   end
+=======
+	if (timer.getTime() > self.coolDownTime) then
+		for i, unitName in pairs(self.monitoring) do
+			local plane = lso.Plane.get(unitName)
+			if (plane) then
+				local status = lso.process.getStatus(plane.unit)
+				if (plane:inAir() or status == lso.process.Status.BREAK) then
+					if (status == lso.process.Status.DEPART) then
+						local radio = lso.RadioCommand:new(string.format("%s.re-enter", plane.name), "Tower", string.format("%s, Re-enter holding pattern.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
+						radio:send()
+						self.coolDownTime = timer.getTime() + radio:getDuration()
+						lso.process.changeStatus(plane.unit, lso.process.Status.IN_SIGHT)
+						lso.menu.removeMenu(plane.unit, lso.menu.Command.DEPART)
+						if not (lso.Carrier.recovery) then
+							lso.menu.addMenu(plane.unit, lso.menu.Command.EMERGENCY)
+						end
+						break
+					elseif (status == lso.process.Status.BREAK) then
+						if (lso.LSO:checkContact(plane)) then
+							table.remove(self.monitoring, i)
+							break
+						end
+						if (
+							lso.Converter.M_FT(plane.altitude) > 1200
+							or lso.Converter.MS_KNOT(plane.speed) > 400
+							or lso.Converter.M_NM(plane.distance) > 4
+						) then
+							lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
+							break
+						end
+					else
+						local carrierHeadding = lso.Carrier:getHeadding(true)
+						if (status == lso.process.Status.IN_SIGHT) then
+							if (not lso.Carrier.turning) then
+								-- 在航母的相对方位 160-200° 之间
+								if (plane.azimuth > 160 and plane.azimuth < 200) then
+									-- 距离 0.5-3 nm
+									if (lso.Converter.M_NM(plane.distance) > 0.5 and lso.Converter.M_NM(plane.distance) < 3) then
+										-- 高度低于 1300 ft，速度小于 400 节 
+										if (lso.Converter.M_FT(plane.altitude) < 1300 and lso.Converter.MS_KNOT(plane.speed) < 400) then
+											-- 航向为航母航向 ±20°
+											if (math.abs(lso.math.getAzimuthError(plane.heading, carrierHeadding, true)) < 20) then
+												lso.RadioCommand:new(string.format("%s.initial", plane.name), plane.number, string.format("%s, Initial.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
+													:onFinish(function()
+														lso.RadioCommand:new(string.format("%s.initial_reply", plane.name), "Tower", string.format("Roger, %s.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
+															:send()
+													end)
+													:send()
+												self.coolDownTime = timer.getTime() + 4
+												lso.process.changeStatus(plane.unit, lso.process.Status.INITIAL)
+												lso.menu.removeMenu(plane.unit, lso.menu.Command.EMERGENCY)
+												lso.menu.addMenu(plane.unit, lso.menu.Command.DEPART, lso.menu.handler.depart)
+												break
+											end
+										end
+									-- elseif (lso.Converter.M_NM(plane.distance) < 1 and lso.Converter.M_FT(plane.altitude) < 1200) then
+										-- lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
+									end
+								-- else
+									-- if (lso.Converter.M_NM(plane.distance) < 2 and lso.Converter.M_FT(plane.altitude) < 1200) then
+										-- lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
+									-- end
+								end
+							-- else
+								-- if (lso.Converter.M_NM(plane.distance) < 2 and lso.Converter.M_FT(plane.altitude) < 1200) then
+									-- lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
+								-- end
+							end
+						elseif (status == lso.process.Status.INITIAL) then
+							-- 在航母的相对方位 270-360° 之间
+							if ((plane.azimuth > 270 and plane.azimuth < 360) or plane.azimuth < 20) then
+								-- 高度低于 1000 ft，速度小于 400 节 
+								if (lso.Converter.M_FT(plane.altitude) < 1000 and lso.Converter.MS_KNOT(plane.speed) < 400) then
+									-- 航向为航母航向向左大于5度
+									if (lso.math.getAzimuthError(plane.heading, carrierHeadding, true) < -3) then
+										-- 飞机侧倾角向左大于25度
+										if (plane.roll > 25) then
+											lso.RadioCommand:new(string.format("%s.break", plane.name), plane.number, string.format("%s, Breaking.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
+												:onFinish(function()
+													lso.RadioCommand:new(string.format("%s.break_reply", plane.name), "Tower", string.format("%s, Dirty up.", plane.number), nil, 2, lso.RadioCommand.Priority.NORMAL)
+														:send()
+												end)
+												:send()
+											self.coolDownTime = timer.getTime() + 5
+											lso.process.changeStatus(plane.unit, lso.process.Status.BREAK)
+											break
+										end
+									end
+								end
+							end
+							if (
+								lso.Converter.M_FT(plane.altitude) > 1300
+								or lso.Converter.MS_KNOT(plane.speed) > 450
+								or lso.Converter.M_NM(plane.distance) > 3
+								or math.abs(lso.math.getAzimuthError(plane.heading, carrierHeadding, true)) > 90
+							) then
+								lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
+								break
+							end
+						else
+							table.remove(self.monitoring, i)
+							break
+						end
+					end
+				else
+					table.remove(self.monitoring, i)
+					break
+				end
+			else
+				table.remove(self.monitoring, i)
+				break
+			end
+		end
+	end
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 end
 
 
@@ -2187,16 +2839,26 @@ lso.LSO.Grade = Enum(
   "CUT"
 )
 lso.LSO.Cause = Enum(
+<<<<<<< HEAD
   "LONG", -- long in the groove
   "DEVIATE",
   "SETTLE",
   "IDLE",
   "WIRE1", -- caught 1 wire
   "FOUL_DECK"
+=======
+	"LONG", -- long in the groove
+	"DEVIATE",
+	"SETTLE", -- settle in close
+	"IDLE", -- idle in the wire
+	"WIRE1", -- caught 1 wire
+	"FOUL_DECK"
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 )
 
 -- 着舰信号官固定指令
 lso.LSO.command = {
+<<<<<<< HEAD
   CONTACT 	= 	lso.RadioCommand:new("lso.CONTACT", 		"LSO", 	"%s, Paddles contact.", 		lso.Sound.LSO.PADDLES_CONTACT	, 1.5, lso.RadioCommand.Priority.NORMAL),
   CALL_BALL 	= 	lso.RadioCommand:new("lso.CALL_THE_BALL", 	"LSO", 	"%s, 3/4 miles, Call the ball.",lso.Sound.LSO.CALL_THE_BALL		, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
   BALL 		= 	lso.RadioCommand:new("lso.BALL_CALL", 		nil, 	"%s, %s ball, %.1f.",			nil								, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
@@ -2218,6 +2880,29 @@ lso.LSO.command = {
   FOUL_DECK	= 	lso.RadioCommand:new("lso.FOUL_DECK",		"LSO", 	"Wave off, Foul deck.", 		lso.Sound.LSO.WAVEOFF			, 6, lso.RadioCommand.Priority.IMMEDIATELY),
   WAVE_OFF	= 	lso.RadioCommand:new("lso.WAVE_OFF",		"LSO", 	"Wave off! Wave off!", 			lso.Sound.LSO.WAVEOFF			, 6, lso.RadioCommand.Priority.IMMEDIATELY),
   BOLTER 		= 	lso.RadioCommand:new("lso.BOLTER", 			"LSO", 	"Bolter! Bolter! Bolter!", 		lso.Sound.LSO.BOLTER			, 6, lso.RadioCommand.Priority.IMMEDIATELY),
+=======
+	CONTACT 	= 	lso.RadioCommand:new("lso.CONTACT", 		"LSO", 	"%s, Paddles contact.", 		lso.Sound.PADDLES_CONTACT	, 1.5, lso.RadioCommand.Priority.NORMAL),
+	CALL_BALL 	= 	lso.RadioCommand:new("lso.CALL_THE_BALL", 	"LSO", 	"%s, 3/4 miles, Call the ball.",lso.Sound.CALL_THE_BALL		, 2.1, lso.RadioCommand.Priority.NORMAL, 	1.5),
+	BALL 		= 	lso.RadioCommand:new("lso.BALL_CALL", 		nil, 	"%s, %s ball, %.1f.",			nil							, 1.3, lso.RadioCommand.Priority.NORMAL, 	1.5),
+	ROGER_BALL 	= 	lso.RadioCommand:new("lso.ROGER_BALL", 		"LSO", 	"Roger ball.", 					lso.Sound.ROGER_BALL		, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
+					
+	KEEP_TURN	= 	lso.RadioCommand:new("lso.KEEP_TURN", 		"LSO", 	"Keep your turn in.", 			lso.Sound.KEEP_TURN			, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
+	HIGH 		= 	lso.RadioCommand:new("lso.HIGH", 			"LSO", 	"You're high!", 				lso.Sound.HIGH				, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
+	LOW 		= 	lso.RadioCommand:new("lso.LOW", 			"LSO", 	"power.", 						lso.Sound.LOW				, 1.5, lso.RadioCommand.Priority.NORMAL, 	1.5),
+	TOO_LOW 	= 	lso.RadioCommand:new("lso.TOO_LOW", 		"LSO", 	"Power!!", 						lso.Sound.TOO_LOW			, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	LEFT 		= 	lso.RadioCommand:new("lso.LEFT", 			"LSO", 	"Right for lineup!", 			lso.Sound.RIGHT				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	RIGHT 		= 	lso.RadioCommand:new("lso.RIGHT", 			"LSO", 	"Come left!", 					lso.Sound.LEFT				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	EASY 		= 	lso.RadioCommand:new("lso.EASY", 			"LSO", 	"Easy with it.", 				lso.Sound.EASY				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	FAST 		= 	lso.RadioCommand:new("lso.FAST", 			"LSO", 	"You're fast!", 				lso.Sound.FAST				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	SLOW 		= 	lso.RadioCommand:new("lso.SLOW", 			"LSO", 	"You're slow!", 				lso.Sound.SLOW				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	SETTLE 		= 	lso.RadioCommand:new("lso.SETTLE", 			"LSO", 	"Don't settle!", 				lso.Sound.SETTLE			, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+	CLIMB 		= 	lso.RadioCommand:new("lso.CLIMB", 			"LSO", 	"Don't climb!", 				lso.Sound.CLIMB				, 1.5, lso.RadioCommand.Priority.NORMAL,	1.5),
+
+	LIG			= 	lso.RadioCommand:new("lso.LIG", 			"LSO", 	"You're long in the groove, Wave off.", lso.Sound.LIG		, 6, lso.RadioCommand.Priority.HIGH),
+	FOUL_DECK	= 	lso.RadioCommand:new("lso.FOUL_DECK",		"LSO", 	"Wave off, Foul deck.", 				lso.Sound.FOUL_DECK , 6, lso.RadioCommand.Priority.HIGH),
+	WAVE_OFF	= 	lso.RadioCommand:new("lso.WAVE_OFF",		"LSO", 	"Wave off! Wave off!", 					lso.Sound.WAVEOFF	, 6, lso.RadioCommand.Priority.HIGH),
+	BOLTER 		= 	lso.RadioCommand:new("lso.BOLTER", 			"LSO", 	"Bolter! Bolter! Bolter!", 				lso.Sound.BOLTER	, 6, lso.RadioCommand.Priority.HIGH),
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 }
 
 -- 着舰信号官指令记录
@@ -2394,6 +3079,7 @@ end
 -- 成功返回 true
 -- 着舰信号官正忙返回 false
 function lso.LSO:track(plane)
+<<<<<<< HEAD
   local callTheBall = 0
   local landTime = nil
   local inGroove = false
@@ -2757,11 +3443,344 @@ function lso.LSO:grade(obj, wire)
     lso.RadioCommand:new("lso.on_board", "LSO", string.format("%s%s%s.", plane.number, gradeMsg, wireMsg), nil, 2, lso.RadioCommand.Priority.NORMAL)
     :send()
   end
+=======
+	local callTheBall = 0
+	local landTime = nil
+	local inGroove = false
+	local lig = false
+	local result = nil
+	local cause = nil
+	local wire = nil
+	local trackData = self.TrackData:new(plane)
+	local trackCommand = function(cmd, check, timestamp, force)
+		if check then
+			if self:showCommand(cmd, nil, force) then
+				trackData:addCommand(cmd, timestamp)
+				return true
+			end
+		end
+		return false
+	end
+	local landFinish = function()
+		lso.LSO.contact = false
+		lso.process.initPlane(plane.unit)
+	end
+	local goAround = function()
+		lso.LSO.contact = false
+		lso.process.changeStatus(plane.unit, lso.process.Status.BREAK)
+		lso.menu.addMenu(plane.unit, lso.menu.Command.ABORT, lso.menu.handler.abort)
+		lso.Tower:checkIn(plane.unit)
+	end
+	local depart = function()
+		lso.LSO.contact = false
+		lso.process.changeStatus(plane.unit, lso.process.Status.DEPART)
+		lso.menu.addMenu(plane.unit, lso.menu.Command.ABORT, lso.menu.handler.abort)
+		lso.Tower:checkIn(plane.unit)
+	end
+	local grade = function()
+		lso.log(string.format("Result: %d\nCause: %d", result.value, cause and cause.value or 0), 5, true)
+		if type(lso.LSO.comment) == "function" then
+			lso.LSO:comment(trackData, result, cause, wire)
+		else
+			if (result == lso.LSO.Result.LAND) then
+				lso.LSO:grade(trackData, result, cause, wire)
+			end
+		end
+	end
+	local trackFrame = function(args, trackTime)
+		if (plane:updateData() and (not lso.Carrier.turning)) then -- 更新飞行数据
+			if (not inGroove) then
+				local deckHeadding = (lso.Carrier:getHeadding(true) - lso.Carrier.data.deck) % 360
+				if (
+					plane.azimuth > 90 and plane.azimuth < 270 -- 在航母后半圆
+					and lso.Converter.M_NM(plane.distance) < 2 -- 距离小于 2 nm
+					and lso.Converter.M_FT(plane.altitude) < 800 -- 高度低于 800 ft
+				) then
+					if (
+						plane.angleError > 0
+						and math.sin(math.rad(plane.angleError)) * plane.distance < 650 -- 到下滑道垂足距离
+						and math.abs(lso.math.getAzimuthError(plane.heading, deckHeadding, true)) > 75
+					)then
+						self:showCommand(self.command.KEEP_TURN)
+					end
+					local carrierPoint = lso.Carrier.unit:getPoint()
+					if (
+						math.abs(lso.math.getAzimuthError(plane.heading, lso.math.getAzimuth(plane.point.z, plane.point.x, carrierPoint.z, carrierPoint.x, true))) < 5
+						or plane.angleError < 3
+					) then
+						inGroove = true
+						if (plane.rtg > 2000) then
+							cause = lso.LSO.Cause.LONG + cause
+							if (#lso.process.getUnitsInStatus(lso.process.Status.BREAK) > 0) then
+								result = lso.LSO.Result.WAVEOFF + result
+								trackCommand(self.command.LIG, true, trackTime)
+							end
+						else
+							return timer.getTime() + 2
+						end
+					end
+					return timer.getTime() + 0.1
+				else
+					depart()
+					return nil
+				end
+				return timer.getTime() + 0.1
+			end
+		
+			local previousData = trackData:getData()
+			-- 当剩余距离小于20m时停止指挥，开始连续检测是否成功钩上
+			if (plane.rtg < 20 and previousData) then
+				if (landTime == nil and ((plane.groundSpeed - lso.Carrier:getSpeed()) < lso.Converter.KNOT_MS(20) or (previousData and (previousData.speed - plane.speed) > 6))) then -- 迅速减速，着舰完成
+					landTime = timer.getTime()
+				end
+				if (landTime ~= nil and (timer.getTime() - landTime) > 8) then
+					landFinish()
+					return nil
+				elseif (landTime ~= nil and (plane.groundSpeed - lso.Carrier:getSpeed()) < lso.Converter.KNOT_MS(2)) then
+					if (plane.distance <= 66) then
+						wire = 1
+						cause = lso.LSO.Cause.WIRE1 + cause
+					elseif (plane.distance > 66 and plane.distance <= 78) then
+						wire = 2
+					elseif (plane.distance > 78 and plane.distance <= 90) then
+						wire = 3
+					elseif (plane.distance > 90 and plane.distance <= 105) then
+						wire = 4
+					end
+					if wire then
+						result = lso.LSO.Result.LAND + result
+					end
+					grade()
+					landFinish()
+					return nil
+				elseif (landTime == nil and plane.rtg < -100 and (plane.groundSpeed - lso.Carrier:getSpeed()) > lso.Converter.KNOT_MS(80)) then -- 穿过着舰区，脱钩
+					if (plane.altitude < lso.Carrier.data.height + 5) then
+						trackCommand(self.command.BOLTER, true, trackTime, true)
+						result = lso.LSO.Result.BOLTER + result
+					end
+					grade()
+					if (result ~= lso.LSO.Result.WAVEOFF) then
+						goAround()
+					end
+					return nil
+				end
+				return timer.getTime() + 0.01
+			end
+			
+			-- 记录新的飞行数据
+			trackData:track(trackTime)
+			
+			-- 近距离时预处理角度误差，以消除快速发散
+			local angleError = plane.angleError * math.min(1, plane.rtg / 160)
+			local gsError = plane.gsError * math.min(1, plane.rtg / 160)
+			
+			-- 计算飞行数据变化
+			local rollVariance = lso.math.getVariance(trackData:getDataRecord("roll", 20))
+			local vsVariance = lso.math.getVariance(trackData:getDataRecord("vs", 20))
+			local vsVariation = previousData and plane.vs - previousData.vs or 0
+			local gsVariation = previousData and gsError - (previousData.gsError * math.min(1, previousData.rtg / 160)) or 0
+			
+			-- 判断AOA
+			local aoaError = 0
+			local aoaHigh = 0
+			local aoaLow = 0
+			local aoaData = trackData:getDataRecord("aoa", 30)
+			for i, aoa in ipairs(aoaData) do
+				local aoaDiff = aoa - plane.model.aoa
+				if (aoaDiff > 1.4) then
+					aoaHigh = aoaHigh + 1
+				elseif (aoaDiff < -1.4) then
+					aoaLow = aoaLow + 1
+				end
+			end
+			if (aoaHigh == #aoaData) then
+				aoaError = 1
+			elseif (aoaLow == #aoaData) then
+				aoaError = -1
+			end
+
+			-- 记录进入每个着舰阶段的时间
+			if (trackData.processTime.start == nil and plane.rtg > 800) then
+				trackData.processTime.start = trackTime
+				-- lso.log("start", 2, true, "start")
+			elseif (trackData.processTime.middle == nil and plane.rtg <= 800 and plane.rtg > 400) then
+				trackData.processTime.middle = trackTime
+				-- lso.log("middle", 2, true, "middle")
+			elseif (trackData.processTime.close == nil and plane.rtg <= 400 and plane.rtg > 80) then
+				trackData.processTime.close = trackTime
+				-- lso.log("close", 2, true, "close")
+			elseif (trackData.processTime.ramp == nil and plane.rtg < 80) then
+				trackData.processTime.ramp = trackTime
+				-- lso.log("ramp", 2, true, "ramp")
+			end
+			
+			if (result ~= nil and result == lso.LSO.Result.WAVEOFF) then
+				
+				if (plane.vs < -2 and gsError < 5) then
+					trackCommand(self.command.WAVE_OFF, true, trackTime)
+				end
+			
+			else
+			
+				-- 判断是否需要复飞
+				local shouldWaveOff = false
+				if (plane.rtg > 60 and plane.rtg <= 400) then
+					shouldWaveOff = (
+						math.abs(angleError) > 2.5
+						or gsError > 1.4
+						or gsError < -1.2
+					)
+				elseif (plane.rtg > 400 and plane.rtg <= 800) then
+					shouldWaveOff = (
+						math.abs(angleError) > 3.5
+						or gsError > 1.7
+						or gsError < -1.4
+					)
+				elseif (plane.rtg > 800) then
+					shouldWaveOff = (
+						math.abs(angleError) > 6
+						or gsError > 2
+						or gsError < -1.6
+					)
+				end
+				if (shouldWaveOff) then
+					if trackCommand(self.command.WAVE_OFF, true, trackTime) then
+						result = lso.LSO.Result.WAVEOFF + result
+						cause = lso.LSO.Cause.DEVIATE + cause
+						goAround()
+					end
+				end
+				
+				-- call the ball
+				if (
+					(callTheBall == 0 or callTheBall == 1)
+					and plane.distance < 1287 and plane.distance > 804 
+				) then
+					callTheBall = 1
+					if (self:showCommand(self.command.CALL_BALL, nil, nil, {plane.number})) then
+						callTheBall = 2
+					end
+				elseif (callTheBall == 2) then
+					local fuelMess = lso.Converter.KG_LB(plane.fuel) / 1000 -- 千磅
+					if (self:showCommand(self.command.BALL, plane.number, nil, {plane.number, plane.model.name, fuelMess})) then
+						callTheBall = 3
+						trackData.processTime.ball = trackTime
+					end
+				elseif (callTheBall == 3) then
+					if (self:showCommand(self.command.ROGER_BALL)) then
+						callTheBall = -1
+					end
+				end
+				
+				-- 记录 In close 阶段下沉
+				if (plane.rtg < 450 and plane.rtg > 80 and gsError < -0.1 and (vsVariation < -0.12 or gsVariation < -0.04)) then
+					cause = lso.LSO.Cause.SETTLE + cause
+				end
+				
+				if (callTheBall < 1 and plane.rtg > 80) then
+
+					-- 根据飞行数据下达指令
+					-- 遵循“先爬升后加速，先减速后下高”原则
+					trackCommand(self.command.TOO_LOW, 		(gsError < -0.6), 							trackTime)
+					trackCommand(self.command.SETTLE,		(plane.rtg < 450 and plane.rtg > 80 and vsVariation < -0.08) or (plane.rtg > 80 and gsError < -0.1 and gsVariation < -0.02),	trackTime)
+					trackCommand(self.command.LOW, 			(gsError < -0.2 and gsError >= -0.6), 		trackTime)
+					if (plane.rtg > 100) then
+						trackCommand(self.command.SLOW, 		(aoaError == 1), 						trackTime)
+						
+						trackCommand(self.command.LEFT, 		(angleError > 1), 						trackTime)
+						trackCommand(self.command.RIGHT, 		(angleError < -1), 						trackTime)
+						
+						trackCommand(self.command.FAST, 		(aoaError == -1), 						trackTime)
+						trackCommand(self.command.CLIMB,		(plane.rtg > 80 and gsError > 0.1 and gsVariation > 0.02),	trackTime)
+						trackCommand(self.command.HIGH, 		(gsError > 0.4), 						trackTime)
+						
+						trackCommand(self.command.EASY, 		(vsVariance > 0.8 or rollVariance > 80), trackTime)
+					end
+					
+				end
+				
+			end
+			
+			lso.log(mist.utils.tableShow(trackData:getData()).."\ngsErrorFix: "..gsError.."\nangleErrorFix: "..angleError.."\nvsVariation: "..vsVariation.."\ngsVariation: "..gsVariation, 5, true, "trackData")
+			return timer.getTime() + 0.1
+		else
+			-- error("LSO onFrame lost unit.")
+			depart()
+			return nil
+		end
+	end
+
+	self.tracking = plane
+	timer.scheduleFunction(trackFrame, nil, timer.getTime() + 0.5)
+	return true
+end
+-- 着舰信号官着陆评分
+function lso.LSO:grade(trackData, result, cause, wire)
+	local plane = trackData.plane
+	-- Grades: 1=OK 2=Fair 3=No Grade 4=Cut
+	local grades = {"OK", "Fair", "No Grade", "Cut"}
+	local grade = 0
+	if (result ~= lso.LSO.Result.WAVEOFF) then
+		grade = 1
+		local command = 0
+		for i, cmd in ipairs(trackData.commands) do
+			if (trackData.processTime.start == nil or cmd.timestamp > trackData.processTime.start) then
+				command = command + 1
+			end
+		end
+		if (command > 1) then
+			grade = 2
+		end
+		for i, data in ipairs(trackData.data) do
+			local angleError = data.angleError * math.min(1, data.rtg / 160)
+			local gsError = data.gsError * math.min(1, data.rtg / 160)
+			if (
+				(trackData.processTime.ball == nil or data.timestamp > trackData.processTime.ball)
+				and (trackData.processTime.ramp == nil or data.timestamp < trackData.processTime.ramp)
+			) then
+				if (
+					math.abs(angleError) > 2.2
+					or gsError > 1.6
+					or gsError < -0.8
+				) then
+					grade = 3
+					-- lso.log("ball", 8, true)
+					-- lso.log(mist.utils.tableShow(trackData.processTime), 8, true)
+					-- lso.log(mist.utils.tableShow(data), 8, true)
+					break
+				end
+			end
+			if (data.rtg > 800) then
+				if (math.abs(angleError) > 3 or gsError > 1.6 or gsError < -0.8) then
+					grade = 3
+					-- lso.log("rtg", 8, true)
+					-- lso.log(mist.utils.tableShow(trackData.processTime), 8, true)
+					-- lso.log(mist.utils.tableShow(data), 8, true)
+					break
+				end
+			end
+		end
+		if (wire == 1 or (cause ~= nil and cause == lso.LSO.Cause.WIRE1 + lso.LSO.Cause.SETTLE)) then
+			grade = 3
+		end
+	else
+		grade = 4
+	end
+	local gradeMsg = grade == 0 and "" or string.format(", %s", grades[grade])
+	local wireMsg = wire == nil and "" or string.format(", %d wire%s", wire, wire == 1 and "" or "s")
+	if (gradeMsg ~= "" and wireMsg ~= "") then
+		local gradeSound = ({lso.Sound.OK, lso.Sound.FAIR, lso.Sound.NO_GRADE, lso.Sound.CUT})[grade]
+		local wireSound = ({lso.Sound.ONE_WIRE, lso.Sound.TWO_WIRES, lso.Sound.THREE_WIRES, lso.Sound.FOUR_WIRES})[wire]
+		lso.RadioCommand:new("lso.on_board", "LSO", string.format("%s%s%s.", plane.number, gradeMsg, wireMsg), {gradeSound, wireSound}, 3, lso.RadioCommand.Priority.NORMAL)
+			:send()
+	end
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 end
 
 
 -- 主检测帧
 function lso:onFrame()
+<<<<<<< HEAD
   local point = lso.Carrier.unit:getPoint()
   local wh, ws = lso.utils.getWindInfo(point)
   lso.log(string.format("风向 %d, 风速 %d", math.deg(wh), lso.Converter.MS_KNOT(ws)), 1, true, "windData")
@@ -2797,6 +3816,43 @@ function lso:onFrame()
       msgFor = {coa = {"all"}},
       name = "mainProcess",
     })
+=======
+	-- 遍历所有飞机
+	local allPlanes = coalition.getPlayers(lso.Carrier.unit:getCoalition())
+	for i, unit in ipairs(allPlanes) do
+		local plane = lso.Plane.get(unit)
+		if plane and plane:updateData() then
+			local angleError = plane.angleError * math.min(1, plane.rtg / 160)
+			local gsError = plane.gsError * math.min(1, plane.rtg / 160)
+			local flightData = {
+				heading = plane.heading, -- 飞机航向（北修正）（角度值）
+				distance = plane.distance, -- 到航母平面距离（m）
+				rtg = plane.rtg, -- RangeToGo（m）
+				angleError = plane.angleError, -- lineup偏差(左正右负)（角度值）
+				gs = plane.gs, -- 飞机当前所处下滑道位置（相对着舰点）（角度值）
+				gsError = plane.gsError, -- 飞机当前所处下滑道偏差（高正低负）（角度值）
+				aoa = plane.aoa, -- 迎角（角度值）
+				roll = plane.roll, -- 滚转角（角度值）
+				atltitude = plane.point.y, -- 高度（m）
+				speed = plane.speed, -- 示空速（m/s）
+				vs = plane.vs, -- 垂直速度（m/s）
+				fuel = plane.fuel, -- 燃油余量 (kg)
+				timestamp = timer.getTime(), -- 数据记录时间戳（ModelTime）（秒）
+			}
+			local point = lso.Carrier.unit:getPoint()
+			local angle = lso.math.getAzimuth(plane.point.z, plane.point.x, point.z, point.x, true)
+			local azimuth = (angle + 180 - lso.Carrier:getHeadding(true)) % 360
+			local distance = lso.utils.getDistance(plane.point.z, plane.point.x, point.z, point.x)
+			lso.log(mist.utils.tableShow(flightData).."\ngsErrorFix: "..gsError.."\nangleErrorFix: "..angleError.."\nazimuth: "..azimuth.."\ndistance: "..distance, 5, true, "logData")
+		end
+	end
+	-- mist.message.add({
+		-- text =  "主检测帧工作中",
+		-- displayTime = 1,
+		-- msgFor = {coa = {"all"}},
+		-- name = "mainProcess",
+	-- })
+>>>>>>> 950e2cff13bc96c00130279c4531fa7f8a63ab3d
 end
 
 -- 全局事件处理器
