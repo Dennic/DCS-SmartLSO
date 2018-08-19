@@ -1,6 +1,7 @@
 lso = {}
-
 lso.debug = true
+lso.dumpTrackData = true
+
 
 -- 航母单位名称
 lso.carrierName = "Mother"
@@ -9,7 +10,7 @@ lso.useRadioFrequency = true
 -- 航母无线电单位名称
 lso.carrierRadioName = "Mother Radio"
 -- 航母自动航行
-lso.carrierSailing = false
+lso.carrierSailing = true
 -- 航母航行区域名称
 lso.carrierSailArea = "Sail Area"
 -- 航母航行速度（节）
@@ -774,6 +775,7 @@ lso.Plane = {__class="Plane",
   gsError, -- 当前下滑道相对标准下滑道误差（角度）
   aoa, -- 攻角（角度）
   roll, -- 侧倾角
+  pitch, -- 俯仰角
   speed, -- 示空速（m/s）
   groundSpeed, -- 地速 (m/s)
   vs, -- 垂直速度（m/s）
@@ -814,6 +816,7 @@ function lso.Plane:updateData()
 			self.gsError = self.gs - (lso.Carrier.data.gs - lso.utils.getPitch(lso.Carrier.unit))
 			self.aoa = math.deg(lso.utils.getAoA(self.unit) or 0)
 			self.roll = math.deg(lso.utils.getRoll(self.unit) or 0)
+			self.pitch = math.deg(lso.utils.getPitch(self.unit) or 0)
 			self.speed = lso.utils.getIndicatedAirSpeed(self.unit) or 0
 			self.groundSpeed = lso.utils.getGroundSpeed(self.unit) or 0
 			self.vs = lso.utils.getVerticalSpeed(self.unit)
@@ -1455,7 +1458,7 @@ function lso.math.random(low, high, decimal)
   end
   value = value * (high - low) + low
   if not decimal then
-    value = round(value)
+    value = lso.math.round(value)
   end
   return value
 end
@@ -2381,6 +2384,7 @@ function lso.LSO.TrackData:track(timestamp)
     gsError = plane.gsError, -- 飞机当前所处下滑道偏差（高正低负）（角度值）
     aoa = plane.aoa, -- 迎角（角度值）
     roll = plane.roll, -- 滚转角（角度值）
+	pitch = plane.pitch, -- 俯仰角（角度制）
     atltitude = plane.point.y, -- 高度（m）
     speed = plane.speed, -- 示空速（m/s）
     vs = plane.vs, -- 垂直速度（m/s）
@@ -2470,6 +2474,7 @@ function lso.LSO:track(plane)
 	local callTheBall = 0
 	local landTime = nil
 	local inGroove = false
+	local turning = true
 	local lig = false
 	local result = nil
 	local cause = nil
@@ -2502,6 +2507,10 @@ function lso.LSO:track(plane)
 	end
 	local grade = function()
 		lso.log(string.format("Result: %d\nCause: %d", result.value, cause and cause.value or 0), 5, true)
+		if (lso.dumpTrackData) then
+			mist.debug.writeData(mist.utils.serialize, {"data", trackData}, "TrackData.text")
+			lso.log("TrackData dump to \"Saved Games/DCS/Logs/TrackData.text\"", 5, true)
+		end
 		if type(lso.LSO.comment) == "function" then
 			lso.LSO:comment(trackData, result, cause, wire)
 		else
@@ -2528,8 +2537,8 @@ function lso.LSO:track(plane)
 					end
 					local carrierPoint = lso.Carrier.unit:getPoint()
 					if (
-						math.abs(lso.math.getAzimuthError(plane.heading, lso.math.getAzimuth(plane.point.z, plane.point.x, carrierPoint.z, carrierPoint.x, true))) < 5
-						or plane.angleError < 3
+						math.abs(lso.math.getAzimuthError(plane.heading, lso.math.getAzimuth(plane.point.z, plane.point.x, carrierPoint.z, carrierPoint.x, true))) < lso.Carrier.data.deck
+						or plane.angleError < 1
 					) then
 						inGroove = true
 						if (plane.rtg > 2000) then
@@ -2551,6 +2560,11 @@ function lso.LSO:track(plane)
 			end
 		
 			local previousData = trackData:getData()
+			
+			if (turning and (plane.angleError < 1 or plane.roll < 10 or (previousData and previousData.angleError <= plane.angleError))) then
+				turning = false
+			end
+			
 			-- 当剩余距离小于20m时停止指挥，开始连续检测是否成功钩上
 			if (plane.rtg < 20 and previousData) then
 				if (landTime == nil and ((plane.groundSpeed - lso.Carrier:getSpeed()) < lso.Converter.KNOT_MS(20) or (previousData and (previousData.speed - plane.speed) > 6))) then -- 迅速减速，着舰完成
@@ -2696,7 +2710,7 @@ function lso.LSO:track(plane)
 				end
 				
 				-- 记录 In close 阶段下沉
-				if (plane.rtg < 450 and plane.rtg > 80 and gsError < -0.1 and (vsVariation < -0.12 or gsVariation < -0.04)) then
+				if (plane.rtg < 450 and plane.rtg > 80 and gsError < 0 and (vsVariation < -0.12 or gsVariation < -0.02)) then
 					cause = lso.LSO.Cause.SETTLE + cause
 				end
 				
@@ -2710,7 +2724,7 @@ function lso.LSO:track(plane)
 					if (plane.rtg > 100) then
 						trackCommand(self.command.SLOW, 		(aoaError == 1), 						trackTime)
 						
-						trackCommand(self.command.LEFT, 		(angleError > 1), 						trackTime)
+						trackCommand(self.command.LEFT, 		(turning == false and angleError > 1), 	trackTime)
 						trackCommand(self.command.RIGHT, 		(angleError < -1), 						trackTime)
 						
 						trackCommand(self.command.FAST, 		(aoaError == -1), 						trackTime)
