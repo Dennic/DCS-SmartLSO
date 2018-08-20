@@ -1549,10 +1549,12 @@ function lso.math.getAzimuthError(a1, a2, degrees)
     diff = math.deg(a1-a2)
   end
   local angleDiff
-  if (diff <= 180) then
+  if (diff <= 180 and diff >= - 180) then
     angleDiff = diff
-  else
+  elseif (diff > 180) then
     angleDiff = diff - 360
+  elseif (diff < -180) then
+    angleDiff = diff + 360
   end
   if (degrees) then
     return angleDiff
@@ -2336,7 +2338,9 @@ function lso.LSO:showCommand(cmd, speaker, force, data)
     if (nowTime >= cdItem.coolTime) then
       commandData.coolDown[tag] = nil
     else
-      if (cdItem.command == cmd) then
+		local coolTag = tag == "lso.TOO_LOW" and "lso.LOW" or tag
+		local cmdTag = cmd.tag == "lso.TOO_LOW" and "lso.LOW" or cmd.tag
+      if (coolTag == cmdTag) then
         cooling = true
       end
     end
@@ -2374,9 +2378,10 @@ function lso.LSO.TrackData:new(plane)
 end
 function lso.LSO.TrackData:track(timestamp)
   local plane = self.plane
+	local deckHeadding = (lso.Carrier:getHeadding(true) - lso.Carrier.data.deck) % 360
   -- 记录新的飞行数据
   local flightData = {
-    heading = plane.heading, -- 飞机航向（北修正）（角度值）
+    headingError = lso.math.getAzimuthError(deckHeadding, plane.heading, true), -- 飞机航向相对倾斜甲板朝向的偏差（北修正）（角度值）
     distance = plane.distance, -- 到航母平面距离（m）
     rtg = plane.rtg, -- RangeToGo（m）
     angleError = plane.angleError, -- lineup偏差(左正右负)（角度值）
@@ -2538,10 +2543,10 @@ function lso.LSO:track(plane)
 					local carrierPoint = lso.Carrier.unit:getPoint()
 					if (
 						math.abs(lso.math.getAzimuthError(plane.heading, lso.math.getAzimuth(plane.point.z, plane.point.x, carrierPoint.z, carrierPoint.x, true))) < lso.Carrier.data.deck
-						or plane.angleError < 1
+						or plane.angleError < 6
 					) then
 						inGroove = true
-						if (plane.rtg > 2000) then
+						if (plane.rtg > 1800) then
 							cause = lso.LSO.Cause.LONG + cause
 							if (#lso.process.getUnitsInStatus(lso.process.Status.BREAK) > 0) then
 								result = lso.LSO.Result.WAVEOFF + result
