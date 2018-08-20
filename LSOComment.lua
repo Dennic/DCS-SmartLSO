@@ -3,6 +3,7 @@ dofile("DumpData.lua")
 --SmartLSO简评与评分模块
 lso.Comment = {}
 
+--简评结构体
 lso.Comment.commentData = {
 	["PRE"] = {},
 	["AW"] = {},
@@ -13,8 +14,27 @@ lso.Comment.commentData = {
 	["POST"] = {}
 }
 
+--简评错误类型
+lso.Comment.errorType = Enum(
+	"G&S", --Glide Slope And Speed Error
+	"LU&W", --Lineup And Wing Error
+	"P", --Power Error
+	"A", --Attitude Error
+	"OTHER" --Other Error
+)
+
+--简评错误标识
 lso.Comment.ShorthandNote = {
-	x = {}
+	H = {
+		NAME = "H",
+		CanBeLeveled = true,
+		AllowedSection = {"AW", "X", "IM", "IC", "AR"}
+	},
+	LO = {
+		NAME = "LO",
+		CanBeLeveled = true,
+		AllowedSection = {"AW", "X", "IM", "IC", "AR"}
+	},
 }
 
 function lso.Comment:addComment(section, comment, level)
@@ -54,8 +74,7 @@ function lso.Comment:addComment(section, comment, level)
 end
 
 --处理程序入口
-function lso.Comment:process(flightData, result, cause, wire)
-  
+function lso.Comment.process(event, timestamp, flightData, result, cause, wire)
 	--遍历处理
 	for i,v in ipairs(flightData.data)
 		do print(v.timestamp .. "," .. v.speed)
@@ -67,9 +86,9 @@ function lso.Comment:process(flightData, result, cause, wire)
 	--计算着舰横向偏移
 	local dist_land_horz = math.sin(last_data.angleError * math.pi / 180) * last_data.distance
 	--判断是否有过大偏差
-	if(dist_land_horz > 3) then
+	if(dist_land_horz > 1.7) then
 		lso.Comment:addComment("POST", "LL")
-	elseif(dist_land_horz < -3) then
+	elseif(dist_land_horz < -1.7) then
 		lso.Comment:addComment("POST", "LR")
 	end
 
@@ -125,6 +144,9 @@ function lso.Comment:process(flightData, result, cause, wire)
 	print(commentStr .. "= " .. gradeStr)
 	return {["commentStr"] = commentStr, ["Grade"] = gradeStr}
 end
+
+--注册广播监听
+lso.Broadcast:receive(lso.Broadcast.event.TRACK_FINISH, lso.Comment.process)
 
 --模拟调用
 local result = lso.test()
