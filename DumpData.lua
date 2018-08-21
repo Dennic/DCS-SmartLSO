@@ -7881,16 +7881,18 @@ EnumObj = {
 		setmetatable(obj, {__index=self, __eq=self.equal, __tostring=self.toString, __add=self.add, __lt=self.lt})
 		return obj
 	end,
-	add=function(self, another)
-		if another == nil or self:equal(another) then
-			return self
-		else
-			return EnumObj:new(self.value + another.value)
+	addParam=function(self, params)
+		for k, v in pairs(params) do
+			assert(self[k] == nil, string.format("invalid Enum parameter \"%s\"", k))
+			self[k] = v
 		end
+		return self
+	end,
+	add=function(self, another)
+		return self:new(self.value + another.value)
 	end,
 	equal=function(self, another)
-		if not another then return false end
-		return EnumObj.band(self.value, type(another) == "number" and another or another.value) > 0
+		return EnumObj.band(self.value, another.value) > 0
 	end,
 	lt=function(self, another)
 		return self.value < another.value
@@ -7922,6 +7924,7 @@ EnumObj = {
 		end
 		return rlt
 	end
+
 }
 function Enum(...)
 	local items = {...}
@@ -7929,10 +7932,18 @@ function Enum(...)
 		items = items[1]
 	end
 	local enum = {}
+	local index = 1
 	for i, v in ipairs(items) do
-		local val = 2 ^ (i - 1)
-        enum[v] = EnumObj:new(val)
-    end
+		local val = 2 ^ (index - 1)
+		local obj = EnumObj:new(val)
+		if type(items[i+1]) == "table" then
+			local params = items[i+1]
+			obj:addParam(params)
+		else
+			index = index + 1
+		end
+		enum[v] = obj
+	end
 	return enum
 end
 -- 模拟 switch 语句块
