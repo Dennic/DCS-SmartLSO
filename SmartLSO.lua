@@ -2595,13 +2595,16 @@ function lso.LSO:track(plane)
 						if wire then
 							result = lso.LSO.Result.LAND + result
 							lso.log(string.format("Fuel Used: %.3f", lso.Converter.KG_LB(previousData.fuel - plane.fuel)), 10, true)
+							if (lso.Converter.KG_LB(previousData.fuel - plane.fuel) < 8) then
+								cause = lso.LSO.Cause.IDLE + cause
+							end
 						end
 						grade()
 						landFinish()
 						return nil
 					end
 				else
-					if (plane.rtg < -100 and (plane.groundSpeed - lso.Carrier:getSpeed()) > lso.Converter.KNOT_MS(80)) then -- 穿过着舰区，脱钩
+					if (plane.rtg < -60 and (plane.groundSpeed - lso.Carrier:getSpeed()) > lso.Converter.KNOT_MS(80)) then -- 穿过着舰区，脱钩
 						if (plane.altitude < lso.Carrier.data.offset.y + 5) then
 							trackCommand(self.command.BOLTER, true, trackTime, true)
 							result = lso.LSO.Result.BOLTER + result
@@ -2853,11 +2856,7 @@ function lso:onFrame()
 				fuel = plane.fuel, -- 燃油余量 (kg)
 				timestamp = timer.getTime(), -- 数据记录时间戳（ModelTime）（秒）
 			}
-			local point = lso.Carrier.unit:getPoint()
-			local angle = lso.math.getAzimuth(plane.point.z, plane.point.x, point.z, point.x, true)
-			local azimuth = (angle + 180 - lso.Carrier:getHeadding(true)) % 360
-			local distance = lso.utils.getDistance(plane.point.z, plane.point.x, point.z, point.x)
-			lso.log(mist.utils.tableShow(flightData).."\ngsErrorFix: "..gsError.."\nangleErrorFix: "..angleError.."\nazimuth: "..azimuth.."\ndistance: "..distance, 5, true, "logData")
+			lso.log(mist.utils.tableShow(flightData).."\ngsErrorFix: "..gsError.."\nangleErrorFix: "..angleError, 5, true, "logData")
 		end
 	end
 	-- mist.message.add({
