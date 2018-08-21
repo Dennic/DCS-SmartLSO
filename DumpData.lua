@@ -7889,7 +7889,11 @@ EnumObj = {
 		return self
 	end,
 	add=function(self, another)
-		return self:new(self.value + another.value)
+		if another == nil or self:equal(another) then
+			return self
+		else
+			return EnumObj:new(self.value + another.value)
+		end
 	end,
 	equal=function(self, another)
 		return EnumObj.band(self.value, another.value) > 0
