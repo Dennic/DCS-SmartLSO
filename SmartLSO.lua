@@ -188,9 +188,10 @@ function switch(value, ...)
 	local cases = {...}
 	local matched = false
 	for i, case in ipairs(cases) do
-		if (matched or (case[1] == value and type(case[2]) == "function")) then
+		if (matched or (case[1] == value and type(case[2]) == "function") or (#case == 1 and type(case[1]) == "function")) then
 			matched = true
-			if (case[2]()) then
+			local code = (#case == 1 and type(case[1]) == "function") and case[1] or case[2]
+			if (code()) then
 				break
 			end
 		end
