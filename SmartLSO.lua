@@ -217,6 +217,7 @@ function lso.removeCheckFrame(id)
 	end
 end
 function lso.doFrame(arg, frameTime)
+	lso.log("检查帧工作中", 5, true, "CheckFrameWorking")
 	local i = 1
 	while i <= #lso.checkFrames do
 		if lso.checkFrames[i] ~= nil then
@@ -1006,7 +1007,8 @@ end
 
 -- RadioCommandGroup 类
 -- 创建和发送无线电指令组
-lso.RadioCommandGroup = {__class="RadioCommandGroup", id, sent, msgQueue, callback, sendTask}
+lso.RadioCommandGroup = {__class="RadioCommandGroup", id, sent, msgQueue, callback, sendTask, 
+	tag, priority}
 lso.RadioCommandGroup.count = 0
 function lso.RadioCommandGroup:new(msgQueue)
 	msgQueue = type(msgQueue) == "table" and msgQueue or {}
@@ -1016,6 +1018,10 @@ function lso.RadioCommandGroup:new(msgQueue)
 		sent = false,
 		msgQueue = msgQueue,
 	}
+	if (#msgQueue > 0) then
+		obj.tag = msgQueue[1].tag
+		obj.priority = msgQueue[1].priority
+	end
 	setmetatable(obj, {__index = self, __eq = self.equalTo, __add=self.concat, __concat=self.concat})
 	return obj
 end
@@ -2257,12 +2263,20 @@ end
 -- Paddles 着舰信号官模块
 lso.LSO = {}
 lso.LSO.contact = false -- 是否在指挥
-
+-- 降落阶段
+lso.LSO.Stage = Enum(
+	"START",
+	"MIDDLE",
+	"IN_CLOSE",
+	"AT_RAMP"
+)
+-- 降落结果
 lso.LSO.Result = Enum(
 	"LAND",
 	"BOLTER",
 	"WAVEOFF"
 )
+-- 成绩
 lso.LSO.Grade = Enum(
 	"OK_UNDERLINE",
 	"OK",
@@ -2270,6 +2284,7 @@ lso.LSO.Grade = Enum(
 	"NO_GRADE",
 	"CUT"
 )
+-- 原因
 lso.LSO.Cause = Enum(
 	"LONG", -- long in the groove
 	"DEVIATE",
@@ -2484,6 +2499,7 @@ end
 function lso.LSO:track(plane)
 	local callTheBall = 0
 	local landTime = nil
+	local stage = nil
 	local inGroove = false
 	local turning = true
 	local lig = false
@@ -2532,6 +2548,8 @@ function lso.LSO:track(plane)
 	end
 	local trackFrame = function(args, trackTime)
 		if (plane:updateData() and (not lso.Carrier.turning)) then -- 更新飞行数据
+		
+			-- 检查是否进入下滑道
 			if (not inGroove) then
 				local deckHeadding = (lso.Carrier:getHeadding(true) - lso.Carrier.data.deck) % 360
 				if (
@@ -2570,8 +2588,10 @@ function lso.LSO:track(plane)
 				return timer.getTime() + 0.1
 			end
 		
+			-- 获取前一条数据
 			local previousData = trackData:getData()
 			
+			-- 检查是否完成转向
 			if (turning and (plane.angleError < 1 or plane.roll < 10 or (previousData and previousData.angleError <= plane.angleError))) then
 				turning = false
 			end
@@ -2627,17 +2647,15 @@ function lso.LSO:track(plane)
 			trackData:track(trackTime)
 			
 			-- 近距离时预处理角度误差，以消除快速发散
-			-- local angleError = plane.angleError * math.min(1, plane.rtg / 160)
+			local angleError = plane.angleError * math.min(1, plane.rtg / 160)
 			-- local gsError = plane.gsError * math.min(1, plane.rtg / 160)
-			local angleError = plane.angleError
 			local gsError = plane.gsError
 			
 			-- 计算飞行数据变化
 			local rollVariance = lso.math.getVariance(trackData:getDataRecord("roll", 20))
 			local vsVariance = lso.math.getVariance(trackData:getDataRecord("vs", 20))
-			local vsVariation = previousData and plane.vs - previousData.vs or 0
-			local gsVariation = previousData and gsError - previousData.gsError or 0
-			-- local gsVariation = previousData and gsError - (previousData.gsError * math.min(1, previousData.rtg / 160)) or 0
+			local vsVariation = previousData and (plane.vs - previousData.vs) or 0
+			local gsVariation = previousData and (gsError - previousData.gsError) or 0
 			
 			-- 判断AOA
 			local aoaError = 0
@@ -2659,22 +2677,25 @@ function lso.LSO:track(plane)
 			end
 
 			-- 记录进入每个着舰阶段的时间
-			if (trackData.processTime.start == nil and plane.rtg > 800) then
+			if (trackData.processTime.start == nil and plane.rtg <= 1389 and plane > 695) then
 				trackData.processTime.start = trackTime
+				stage = lso.LSO.Stage.START
 				-- lso.log("start", 2, true, "start")
-			elseif (trackData.processTime.middle == nil and plane.rtg <= 800 and plane.rtg > 300) then
+			elseif (trackData.processTime.middle == nil and plane.rtg <= 695 and plane.rtg > 300) then
 				trackData.processTime.middle = trackTime
+				stage = lso.LSO.Stage.MIDDLE
 				-- lso.log("middle", 2, true, "middle")
-			elseif (trackData.processTime.close == nil and plane.rtg <= 300 and plane.rtg > 110) then
+			elseif (trackData.processTime.close == nil and plane.rtg <= 300 and plane.rtg > 100) then
 				trackData.processTime.close = trackTime
+				stage = lso.LSO.Stage.IN_CLOSE
 				-- lso.log("close", 2, true, "close")
-			elseif (trackData.processTime.ramp == nil and plane.rtg <= 110) then
+			elseif (trackData.processTime.ramp == nil and plane.rtg <= 100) then
 				trackData.processTime.ramp = trackTime
+				stage = lso.LSO.Stage.AT_RAMP
 				-- lso.log("ramp", 2, true, "ramp")
 			end
 			
 			if (result ~= nil and result == lso.LSO.Result.WAVEOFF) then
-				
 				if (plane.vs < -2 and gsError < 5) then
 					trackCommand(self.command.WAVE_OFF, true, trackTime)
 				end
@@ -2683,25 +2704,34 @@ function lso.LSO:track(plane)
 			
 				-- 判断是否需要复飞
 				local shouldWaveOff = false
-				if (plane.rtg > 80 and plane.rtg <= 256) then
-					shouldWaveOff = (
-						math.abs(angleError) > 2.5
-						or gsError > 1.4
-						or gsError < -1.2
-					)
-				elseif (plane.rtg > 400 and plane.rtg <= 800) then
-					shouldWaveOff = (
-						math.abs(angleError) > 3.5
-						or gsError > 1.7
-						or gsError < -1.4
-					)
-				elseif (plane.rtg > 800) then
-					shouldWaveOff = (
-						math.abs(angleError) > 6
-						or gsError > 2
-						or gsError < -1.6
-					)
-				end
+				switch( stage,
+					{lso.LSO.Stage.IN_CLOSE, function()
+						shouldWaveOff = (
+							math.abs(angleError) > 1.5
+							or gsError > 1
+							or gsError < -0.8
+						)
+						return true
+					end},
+					{lso.LSO.Stage.MIDDLE, function()
+						shouldWaveOff = (
+							math.abs(angleError) > 3
+							or gsError > 1.2
+							or gsError < -1.1
+						)
+						return true
+					end},
+					{lso.LSO.Stage.START, function()
+					end},
+					{function()
+						shouldWaveOff = (
+							math.abs(angleError) > 6
+							or gsError > 1.6
+							or gsError < -1.4
+						)
+						return true
+					end}
+				)
 				if (shouldWaveOff) then
 					if trackCommand(self.command.WAVE_OFF, true, trackTime) then
 						result = lso.LSO.Result.WAVEOFF + result
@@ -2711,32 +2741,23 @@ function lso.LSO:track(plane)
 				end
 				
 				-- call the ball
-				if (
-					(callTheBall == 0 or callTheBall == 1)
-					and plane.distance < 1287 and plane.distance > 804 
-				) then
-					callTheBall = 1
-					if (self:showCommand(self.command.CALL_BALL, nil, nil, {plane.number})) then
-						callTheBall = 2
-					end
-				elseif (callTheBall == 2) then
+				if (trackData.processTime.ball == nil and stage == lso.LSO.Stage.START) then
 					local fuelMess = lso.Converter.KG_LB(plane.fuel) / 1000 -- 千磅
-					if (self:showCommand(self.command.BALL, plane.number, nil, {plane.number, plane.model.name, fuelMess})) then
-						callTheBall = 3
+					if (self:showCommand(
+							self.command.CALL_BALL:prepare({plane.number}) 
+							+ self.command.BALL:prepare(plane.number, {plane.number, plane.model.name, fuelMess})
+							+ self.command.ROGER_BALL
+						)) then
 						trackData.processTime.ball = trackTime
-					end
-				elseif (callTheBall == 3) then
-					if (self:showCommand(self.command.ROGER_BALL)) then
-						callTheBall = -1
 					end
 				end
 				
 				-- 记录 In close 阶段下沉
-				if (plane.rtg < 450 and plane.rtg > 50 and gsError < 0 and (vsVariation < -0.12 or gsVariation < -0.02)) then
+				if (plane.rtg < 300 and plane.rtg > 50 and gsError < 0 and (vsVariation < -0.12 or gsVariation < -0.02)) then
 					cause = lso.LSO.Cause.SETTLE + cause
 				end
 				
-				if (callTheBall < 1 and plane.rtg > 100) then
+				if (stage ~= lso.LSO.Stage.AT_RAMP) then
 
 					-- 根据飞行数据下达指令
 					-- 遵循“先爬升后加速，先减速后下高”原则
