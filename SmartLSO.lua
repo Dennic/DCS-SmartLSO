@@ -2266,6 +2266,7 @@ lso.LSO = {}
 lso.LSO.contact = false -- 是否在指挥
 -- 降落阶段
 lso.LSO.Stage = Enum(
+	"POST",
 	"START",
 	"MIDDLE",
 	"IN_CLOSE",
@@ -2412,7 +2413,7 @@ function lso.LSO.TrackData:track(timestamp)
 		aoa = plane.aoa, -- 迎角（角度值）
 		roll = plane.roll, -- 滚转角（角度值）
 		pitch = plane.pitch, -- 俯仰角（角度制）
-		atltitude = plane.point.y, -- 高度（m）
+		altitude = plane.atltitude, -- 高度（m）
 		speed = plane.speed, -- 示空速（m/s）
 		vs = plane.vs, -- 垂直速度（m/s）
 		fuel = plane.fuel, -- 燃油余量 (kg)
@@ -2552,33 +2553,54 @@ function lso.LSO:track(plane)
 		
 			-- 检查是否进入下滑道
 			if (not inGroove) then
+				-- 检查飞机是否在正确的位置
 				local deckHeadding = (lso.Carrier:getHeadding(true) - lso.Carrier.data.deck) % 360
 				if (
 					plane.azimuth > 90 and plane.azimuth < 270 -- 在航母后半圆
 					and lso.Converter.M_NM(plane.distance) < 2 -- 距离小于 2 nm
 					and lso.Converter.M_FT(plane.altitude) < 800 -- 高度低于 800 ft
 				) then
+					deckAzimuthError = lso.math.getAzimuthError(plane.heading, deckHeadding, true) -- 飞机航向与甲板朝向的偏差
+					-- 当飞机距离下滑道650m以内时检查是否需要提醒保持转向
 					if (
 						plane.angleError > 0
 						and math.sin(math.rad(plane.angleError)) * plane.distance < 650 -- 到下滑道垂足距离
-						and math.abs(lso.math.getAzimuthError(plane.heading, deckHeadding, true)) > 75
+						and math.abs(deckAzimuthError) > 75
 					)then
 						self:showCommand(self.command.KEEP_TURN)
 					end
+					-- 当飞机位于the90时距离大于1.25nm，判定LIG
+					if (stage ~= lso.LSO.Stage.POST and deckAzimuthError < 90) then
+						stage = lso.LSO.Stage.POST
+						if (plane.rtg > 2315) then
+							cause = lso.LSO.Cause.LONG + cause
+							-- 判定LIG时如果后面有飞机已经Break则WaveOff
+							if (#lso.process.getUnitsInStatus(lso.process.Status.BREAK) > 0) then
+								inGroove = true
+								result = lso.LSO.Result.WAVEOFF + result
+								trackCommand(self.command.LIG, true, trackTime)
+							end
+						end
+					end
+					-- 判断飞机是否进入下滑道
+					-- 1.飞机进入下滑道偏差±6°以内
+					-- 2.飞机整朝向航母方向±甲板斜角以内
 					local carrierPoint = lso.Carrier.unit:getPoint()
 					if (
 						math.abs(lso.math.getAzimuthError(plane.heading, lso.math.getAzimuth(plane.point.z, plane.point.x, carrierPoint.z, carrierPoint.x, true))) < lso.Carrier.data.deck
 						or plane.angleError < 6
 					) then
 						inGroove = true
-						if (plane.rtg > 1800) then
+						-- 距离大于1600m，判定LIG
+						if (plane.rtg > 1600) then
 							cause = lso.LSO.Cause.LONG + cause
+							-- 判定LIG时如果后面有飞机已经Break则WaveOff
 							if (#lso.process.getUnitsInStatus(lso.process.Status.BREAK) > 0) then
 								result = lso.LSO.Result.WAVEOFF + result
 								trackCommand(self.command.LIG, true, trackTime)
 							end
 						else
-							return timer.getTime() + 2
+							return timer.getTime() + 1
 						end
 					end
 					return timer.getTime() + 0.1
@@ -2620,7 +2642,7 @@ function lso.LSO:track(plane)
 						if wire then
 							result = lso.LSO.Result.LAND + result
 							lso.log(string.format("Fuel Used: %.3f", lso.Converter.KG_LB(previousData.fuel - plane.fuel)), 10, true)
-							if (lso.Converter.KG_LB(previousData.fuel - plane.fuel) < 8) then
+							if (lso.Converter.KG_LB(previousData.fuel - plane.fuel) < 6) then
 								cause = lso.LSO.Cause.IDLE + cause
 							end
 						end
@@ -2642,6 +2664,11 @@ function lso.LSO:track(plane)
 					end
 				end
 				return timer.getTime() + 0.01
+			else
+				if (plane.groundSpeed < lso.Converter.KNOT_MS(20)) then
+					landFinish()
+					return nil
+				end
 			end
 			
 			-- 记录新的飞行数据
@@ -2678,7 +2705,7 @@ function lso.LSO:track(plane)
 			end
 
 			-- 记录进入每个着舰阶段的时间
-			if (trackData.processTime.start == nil and plane.rtg <= 1389 and plane > 695) then
+			if (trackData.processTime.start == nil and plane.rtg <= 1389 and plane.rtg > 695) then
 				trackData.processTime.start = trackTime
 				stage = lso.LSO.Stage.START
 				-- lso.log("start", 2, true, "start")
@@ -2723,12 +2750,18 @@ function lso.LSO:track(plane)
 						return true
 					end},
 					{lso.LSO.Stage.START, function()
-					end},
-					{function()
 						shouldWaveOff = (
 							math.abs(angleError) > 6
 							or gsError > 1.6
 							or gsError < -1.4
+						)
+						return true
+					end},
+					{lso.LSO.Stage.POST, function()
+						shouldWaveOff = (
+							math.abs(angleError) > 6
+							or gsError > 1.6
+							or (gsError < -1.4 and plane.altitude < lso.Converter.FT_M(250))
 						)
 						return true
 					end}
@@ -2791,7 +2824,6 @@ function lso.LSO:track(plane)
 		end
 	end
 
-	self.tracking = plane
 	timer.scheduleFunction(trackFrame, nil, timer.getTime() + 0.5)
 	return true
 end
