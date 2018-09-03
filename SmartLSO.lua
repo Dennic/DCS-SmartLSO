@@ -1913,7 +1913,10 @@ function lso.process.getUnitsInStatus(status)
 	end
 	for unitName, currStatus in pairs(lso.process.currentStatus) do
 		if (status == currStatus) then
-			insert(Unit.getByName(unitName))
+			local unit = Unit.getByName(unitName)
+			if (unit and unit:isExist()) then
+				insert(unit)
+			end
 		end
 	end
 	return units
