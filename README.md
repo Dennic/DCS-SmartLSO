@@ -22,9 +22,7 @@ Smart LSO 是我正在开发的一个 DCS 任务脚本，主要用于模拟美�
 
 使用步骤如下：
 
-1. 下载最新的 Smart LSO 脚本（zip 压缩包），并解压。
-
-[发布下载地址](https://github.com/Dennic/DCS-SmartLSO/releases)
+1. 下载最新的 Smart LSO 脚本（zip 压缩包），并解压。 [【发布下载地址】](https://github.com/Dennic/DCS-SmartLSO/releases)
 
 2. 进入游戏内置任务编辑器，打开或新建一个任务。
 
