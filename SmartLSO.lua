@@ -15,6 +15,10 @@ lso.carrierSailing = true
 lso.carrierSailArea = "Sail Area"
 -- 航母航行速度（节）
 lso.carrierSpeed = 25
+-- 使用无线电F10二级菜单
+lso.useSubMenu = false
+-- 二级菜单名称
+lso.subMenuName = "Carrier"
 
 
 -- 音频库
@@ -1895,7 +1899,7 @@ function lso.process.removePlane(unit)
 		lso.Broadcast:send(lso.Broadcast.event.REMOVE_PLANE, plane)
 	end
 	lso.process.changeStatus(unit, lso.process.Status.NONE)
-	lso.Menu:clearMenu(unit)
+	lso.Menu:clearMenu(unit, true)
 end
 function lso.process.getUnitsInStatus(status)
 	local units = {}
@@ -1955,9 +1959,6 @@ function lso.Menu:addMenu(unit, menu, handler)
 	if (unit.__class == "Plane") then
 		unit = unit.unit
 	end
-	if (lso.Menu.path[unit:getName()] == nil) then
-		lso.Menu.path[unit:getName()] = {}
-	end
 	if (lso.Menu.path[unit:getName()][menu.text] == nil) then
 		if not (handler) then
 			if type(menu.handler) == "string" then
@@ -1971,10 +1972,10 @@ function lso.Menu:addMenu(unit, menu, handler)
 			for i, m in ipairs(lso.Menu.order) do
 				if (lso.Menu:hasMenu(unit, m)) then
 					local mData = lso.Menu:getMenu(unit, m)
-					lso.Menu.path[unit:getName()][m.text].path = missionCommands.addCommandForGroup(unit:getGroup():getID(), m.text, nil, mData.handler, unit:getName())
+					lso.Menu.path[unit:getName()][m.text].path = missionCommands.addCommandForGroup(unit:getGroup():getID(), m.text, lso.Menu.path[unit:getName()].root, mData.handler, unit:getName())
 				elseif (m == menu) then
 					lso.Menu.path[unit:getName()][menu.text] = {
-						path = missionCommands.addCommandForGroup(unit:getGroup():getID(), menu.text, nil, handler, unit:getName()),
+						path = missionCommands.addCommandForGroup(unit:getGroup():getID(), menu.text, lso.Menu.path[unit:getName()].root, handler, unit:getName()),
 						handler = handler,
 					}
 				end
@@ -1988,9 +1989,6 @@ function lso.Menu:removeMenu(unit, menu)
 	if (unit.__class == "Plane") then
 		unit = unit.unit
 	end
-	if (lso.Menu.path[unit:getName()] == nil) then
-		lso.Menu.path[unit:getName()] = {}
-	end
 	if (lso.Menu.path[unit:getName()][menu.text] ~= nil) then
 		missionCommands.removeItemForGroup(unit:getGroup():getID(), lso.Menu.path[unit:getName()][menu.text].path)
 		lso.Menu.path[unit:getName()][menu.text] = nil
@@ -2003,17 +2001,11 @@ function lso.Menu:getMenu(unit, menu)
 	if (unit.__class == "Plane") then
 		unit = unit.unit
 	end
-	if (lso.Menu.path[unit:getName()] == nil) then
-		lso.Menu.path[unit:getName()] = {}
-	end
 	return lso.Menu.path[unit:getName()][menu.text]
 end
 function lso.Menu:hasMenu(unit, menu)
 	if (unit.__class == "Plane") then
 		unit = unit.unit
-	end
-	if (lso.Menu.path[unit:getName()] == nil) then
-		lso.Menu.path[unit:getName()] = {}
 	end
 	return lso.Menu.path[unit:getName()][menu.text] ~= nil
 end
@@ -2023,14 +2015,27 @@ function lso.Menu:initMenu(unit)
 	end
 	lso.Menu:clearMenu(unit)
 	lso.Menu.path[unit:getName()] = {}
+	if lso.useSubMenu then
+		lso.Menu.path[unit:getName()].root = missionCommands.addSubMenuForGroup(unit:getGroup():getID(), lso.subMenuName)
+	end
 	lso.Menu:addMenu(unit, lso.Menu.Command.CHECK_IN, lso.Menu.handler.checkIn)
 	lso.Broadcast:send(lso.Broadcast.event.INIT_MENU, unit)
 end
-function lso.Menu:clearMenu(unit)
+function lso.Menu:clearMenu(unit, removePath)
 	if (unit.__class == "Plane") then
 		unit = unit.unit
 	end
-	missionCommands.removeItemForGroup(unit:getGroup():getID())
+	local unitName = unit:getName()
+	if lso.Menu.path[unitName] ~= nil then
+		for tag, menu in pairs(lso.Menu.Command) do
+			if lso.Menu.path[unitName][menu.text] ~= nil then
+				missionCommands.removeItemForGroup(unit:getGroup():getID(), lso.Menu.path[unitName][menu.text].path)
+				if removePath then
+					lso.Menu.path[unitName][menu.text] = nil
+				end
+			end
+		end
+	end
 end
 
 -- 默认菜单处理器
