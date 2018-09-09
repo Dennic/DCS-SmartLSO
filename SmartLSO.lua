@@ -1949,6 +1949,7 @@ function lso.Menu:registerMenu(tag, text, handler, order)
 	assert(self.Command[tag] == nil, string.format("Fail to register menu (Tag \"%s\"already exist).", tag))
 	self.Command[tag] = {text=text, handler=handler}
 	table.insert(self.order, order or 1, self.Command[tag])
+	return self.Command[tag]
 end
 function lso.Menu:addMenu(unit, menu, handler)
 	if (unit.__class == "Plane") then
