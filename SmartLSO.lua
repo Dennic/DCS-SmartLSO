@@ -581,6 +581,9 @@ function lso.Carrier:addRoute(clearAll)
 				break
 			end
 		end
+		if nextPoint == nil then
+			return false
+		end
 	else
 		if (self.recovery == true) then
 			self.recovery = false
