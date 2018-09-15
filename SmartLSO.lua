@@ -15,6 +15,10 @@ lso.carrierSailing = true
 lso.carrierSailArea = "Sail Area"
 -- 航母航行速度（节）
 lso.carrierSpeed = 25
+-- 使用无线电F10二级菜单
+lso.useSubMenu = false
+-- 二级菜单名称
+lso.subMenuName = "Carrier"
 
 
 -- 音频库
@@ -433,6 +437,7 @@ lso.Carrier = {
 	inProcess = {}, -- 等待回收中的飞机
 	recoveryStop, -- 结束回收计划
 	backToCruise = false, -- 正在返回巡航区域
+	foulTime = {}, -- 进入 foul lines 的时间
 }
 function lso.Carrier:addPlane(plane)
 	local recoveryStarted = false
@@ -577,6 +582,9 @@ function lso.Carrier:addRoute(clearAll)
 				break
 			end
 		end
+		if nextPoint == nil then
+			return false
+		end
 	else
 		if (self.recovery == true) then
 			self.recovery = false
@@ -709,7 +717,11 @@ end
 -- degrees: 是否返回角度值
 -- 返回值: 航母航向
 function lso.Carrier:getHeadding(degrees)
-	return math.deg(lso.utils.getHeading(self.unit, degrees) or 0)
+	local heading = lso.utils.getHeading(self.unit, true)
+	if degrees then
+		heading = math.deg(heading)
+	end
+	return heading
 end
 -- 计算当前进近角相对于当前着陆甲板朝向的角度偏差
 -- angle: 当前进近角
@@ -730,6 +742,66 @@ function lso.Carrier:getSpeed()
 end
 function lso.Carrier:getCharlie()
 	return (not self.turning) and self.recovery and math.abs(lso.Carrier:getBRC() - (lso.Carrier:getHeadding(true) or lso.Carrier:getBRC())) < 10
+end
+function lso.Carrier:checkOnRunway(unit)
+	if (unit.__class == "Plane") then
+		unit = plane.unit
+	end
+	local lx, ly = lso.Carrier:getLandingPoint()
+	local unitPoint = unit:getPoint()
+	local angle = lso.math.getAzimuth(unitPoint.z, unitPoint.x, lx, ly, true)
+	local angleError = lso.Carrier:getAngleError(angle, true)
+	local unitHeading = math.deg(lso.utils.getHeading(unit, true) or 0)
+	local checkPoint
+	if (unit:getDesc().box) then
+		local box = unit:getDesc().box
+		local parts = {
+			nose = lso.math.rotateOffsetPoint({x=box.max.x, y=0, z=0}, unitHeading),
+			tail = lso.math.rotateOffsetPoint({x=box.min.x, y=0, z=0}, unitHeading),
+			left = lso.math.rotateOffsetPoint({x=0, y=0, z=box.min.z}, unitHeading),
+			right = lso.math.rotateOffsetPoint({x=0, y=0, z=box.max.z}, unitHeading),
+		}
+		checkPoints = {
+			{
+				x = unitPoint.x + parts.nose.x,
+				y = unitPoint.y,
+				z = unitPoint.z + parts.nose.z,
+			},
+			{
+				x = unitPoint.x + parts.tail.x,
+				y = unitPoint.y,
+				z = unitPoint.z + parts.tail.z,
+			},
+			{
+				x = unitPoint.x + parts.left.x,
+				y = unitPoint.y,
+				z = unitPoint.z + parts.left.z,
+			},
+			{
+				x = unitPoint.x + parts.right.x,
+				y = unitPoint.y,
+				z = unitPoint.z + parts.right.z,
+			},
+		}
+	else
+		checkPoints = {unitPoint}
+	end
+	local part = 0
+	for i, point in ipairs(checkPoints) do
+		local distance = lso.utils.getDistance(point.z, point.x, lx, ly)
+		local angle = lso.math.getAzimuth(point.z, point.x, lx, ly, true)
+		local angleError = lso.Carrier:getAngleError(angle, true)
+		local rtg = distance * math.cos(math.rad(angleError))
+		local offset = distance * math.sin(math.rad(angleError))
+		if (math.abs(rtg) < self.data.runway.length / 2) and (math.abs(offset) < self.data.runway.width / 2) and (point.y - lso.Carrier.data.offset.y < 5) then
+			if (part == 0) then
+				part = i
+			else
+				part = 5
+			end
+		end
+	end
+	return part ~= 0, part
 end
 function lso.Carrier:onFrame()
 	-- lso.print(string.format("Case %d\ninProcess %d\nrecovery %s\nbackToCruise %s", self.case, #self.inProcess, self.recovery and "true" or "false", self.backToCruise and "true" or "false"), 1, true, "carrierFrame")
@@ -827,23 +899,55 @@ function lso.Carrier:onFrame()
 	local foulDeck = false
 	local side = self.unit:getCoalition()
 	for i, group in ipairs(lso.utils.listConcat(coalition.getGroups(side, Group.Category.AIRPLANE), coalition.getGroups(side, Group.Category.HELICOPTER))) do
-		for i, unit in ipairs(group:getUnits()) do
+		for j, unit in ipairs(group:getUnits()) do
 			if unit:isExist() then
-				local point = unit:getPoint()
-				local lx, ly = lso.Carrier:getLandingPoint()
-				local angle = lso.math.getAzimuth(point.z, point.x, lx, ly, true)
-				local angleError = lso.Carrier:getAngleError(angle, true)
-				local distance = lso.utils.getDistance(point.z, point.x, lx, ly)
-				local rtg = distance * math.cos(math.rad(angleError))
-				local offset = distance * math.sin(math.rad(angleError))
-				if (math.abs(rtg) < self.data.runway.length / 2) and (math.abs(offset) < self.data.runway.width / 2) and (point.y - lso.Carrier.data.offset.y < 5) then
-					foulDeck = true
-					break
+				local carrierPoint = lso.Carrier.unit:getPoint()
+				local unitPoint = unit:getPoint()
+				if (lso.utils.getDistance(unitPoint.z, unitPoint.x, carrierPoint.z, carrierPoint.x) < 300) then
+					local onRunway, part = lso.Carrier:checkOnRunway(unit)
+					local plane = lso.Plane.get(unit)
+					if plane then
+						if (plane.onRunway == true and onRunway == true) then -- 在跑道
+							if ((self.foulTime[unit:getName()] == nil or timer.getTime() - self.foulTime[unit:getName()] > 10)
+								and lso.Carrier.recovery 
+								and #lso.process.getUnitsInStatus(lso.process.Status.PADDLES) == 0
+							) then
+								self.foulTime[unit:getName()] = timer.getTime()
+								local partName = "plane"
+								switch(part,
+									{1, function()
+										partName = "nose"
+										return true
+									end},
+									{2, function()
+										partName = "tail"
+										return true
+									end},
+									{3, function()
+										partName = "left wing"
+										return true
+									end},
+									{4, function()
+										partName = "right wing"
+										return true
+									end},
+									{5, function()
+										partName = "plane"
+										return true
+									end}
+								)
+								lso.RadioCommand:new(string.format("%s.onRunway", plane.number), "Air Boss", string.format("%s, Move your %s out of the foul lines.", plane.number, partName), nil, 2, lso.RadioCommand.Priority.NORMAL):send()
+							end
+						elseif (plane.onRunway == true and onRunway == false) then -- 出跑道
+							self.foulTime[unit:getName()] = nil
+						end
+						plane.onRunway = onRunway
+					end
+					if (onRunway) then
+						foulDeck = true
+					end
 				end
 			end
-		end
-		if (foulDeck) then
-			break
 		end
 	end
 	self.foulDeck = foulDeck
@@ -854,6 +958,7 @@ end
 -- 包含了所需的飞行参数
 lso.Plane = {__class="Plane",
 	case, -- 飞机正在执行的回收状况
+	onRunway, -- 是否在跑道上
 	unit, -- 飞机单位
 	name, -- 飞机单位名称
 	model, -- 飞机型号
@@ -1895,7 +2000,7 @@ function lso.process.removePlane(unit)
 		lso.Broadcast:send(lso.Broadcast.event.REMOVE_PLANE, plane)
 	end
 	lso.process.changeStatus(unit, lso.process.Status.NONE)
-	lso.Menu:clearMenu(unit)
+	lso.Menu:clearMenu(unit, true)
 end
 function lso.process.getUnitsInStatus(status)
 	local units = {}
@@ -1949,13 +2054,11 @@ function lso.Menu:registerMenu(tag, text, handler, order)
 	assert(self.Command[tag] == nil, string.format("Fail to register menu (Tag \"%s\"already exist).", tag))
 	self.Command[tag] = {text=text, handler=handler}
 	table.insert(self.order, order or 1, self.Command[tag])
+	return self.Command[tag]
 end
 function lso.Menu:addMenu(unit, menu, handler)
 	if (unit.__class == "Plane") then
 		unit = unit.unit
-	end
-	if (lso.Menu.path[unit:getName()] == nil) then
-		lso.Menu.path[unit:getName()] = {}
 	end
 	if (lso.Menu.path[unit:getName()][menu.text] == nil) then
 		if not (handler) then
@@ -1970,10 +2073,10 @@ function lso.Menu:addMenu(unit, menu, handler)
 			for i, m in ipairs(lso.Menu.order) do
 				if (lso.Menu:hasMenu(unit, m)) then
 					local mData = lso.Menu:getMenu(unit, m)
-					lso.Menu.path[unit:getName()][m.text].path = missionCommands.addCommandForGroup(unit:getGroup():getID(), m.text, nil, mData.handler, unit:getName())
+					lso.Menu.path[unit:getName()][m.text].path = missionCommands.addCommandForGroup(unit:getGroup():getID(), m.text, lso.Menu.path[unit:getName()].root, mData.handler, unit:getName())
 				elseif (m == menu) then
 					lso.Menu.path[unit:getName()][menu.text] = {
-						path = missionCommands.addCommandForGroup(unit:getGroup():getID(), menu.text, nil, handler, unit:getName()),
+						path = missionCommands.addCommandForGroup(unit:getGroup():getID(), menu.text, lso.Menu.path[unit:getName()].root, handler, unit:getName()),
 						handler = handler,
 					}
 				end
@@ -1987,9 +2090,6 @@ function lso.Menu:removeMenu(unit, menu)
 	if (unit.__class == "Plane") then
 		unit = unit.unit
 	end
-	if (lso.Menu.path[unit:getName()] == nil) then
-		lso.Menu.path[unit:getName()] = {}
-	end
 	if (lso.Menu.path[unit:getName()][menu.text] ~= nil) then
 		missionCommands.removeItemForGroup(unit:getGroup():getID(), lso.Menu.path[unit:getName()][menu.text].path)
 		lso.Menu.path[unit:getName()][menu.text] = nil
@@ -2002,17 +2102,11 @@ function lso.Menu:getMenu(unit, menu)
 	if (unit.__class == "Plane") then
 		unit = unit.unit
 	end
-	if (lso.Menu.path[unit:getName()] == nil) then
-		lso.Menu.path[unit:getName()] = {}
-	end
 	return lso.Menu.path[unit:getName()][menu.text]
 end
 function lso.Menu:hasMenu(unit, menu)
 	if (unit.__class == "Plane") then
 		unit = unit.unit
-	end
-	if (lso.Menu.path[unit:getName()] == nil) then
-		lso.Menu.path[unit:getName()] = {}
 	end
 	return lso.Menu.path[unit:getName()][menu.text] ~= nil
 end
@@ -2022,14 +2116,27 @@ function lso.Menu:initMenu(unit)
 	end
 	lso.Menu:clearMenu(unit)
 	lso.Menu.path[unit:getName()] = {}
+	if lso.useSubMenu then
+		lso.Menu.path[unit:getName()].root = missionCommands.addSubMenuForGroup(unit:getGroup():getID(), lso.subMenuName)
+	end
 	lso.Menu:addMenu(unit, lso.Menu.Command.CHECK_IN, lso.Menu.handler.checkIn)
 	lso.Broadcast:send(lso.Broadcast.event.INIT_MENU, unit)
 end
-function lso.Menu:clearMenu(unit)
+function lso.Menu:clearMenu(unit, removePath)
 	if (unit.__class == "Plane") then
 		unit = unit.unit
 	end
-	missionCommands.removeItemForGroup(unit:getGroup():getID())
+	local unitName = unit:getName()
+	if lso.Menu.path[unitName] ~= nil then
+		for tag, menu in pairs(lso.Menu.Command) do
+			if lso.Menu.path[unitName][menu.text] ~= nil then
+				missionCommands.removeItemForGroup(unit:getGroup():getID(), lso.Menu.path[unitName][menu.text].path)
+				if removePath then
+					lso.Menu.path[unitName][menu.text] = nil
+				end
+			end
+		end
+	end
 end
 
 -- 默认菜单处理器
@@ -2788,7 +2895,7 @@ function lso.LSO:track(plane)
 	end
 	local trackFrame = function(args, trackTime)
 		local status, err = pcall(function()	
-			if (plane:updateData() and lso.process.getStatus(plane) == lso.process.Status.PADDLES) then -- 更新飞行数据
+			if (plane:updateData() and lso.process.getStatus(plane) == lso.process.Status.PADDLES + lso.process.Status.BREAK) then -- 更新飞行数据
 			
 				-- 检查是否进入下滑道
 				if (not inGroove) then
@@ -2860,6 +2967,14 @@ function lso.LSO:track(plane)
 				
 				-- 当剩余距离小于20m时停止指挥，开始连续检测是否成功钩上
 				if (plane.rtg < 20 and previousData) then
+					lso.print(string.format("landTime: %.3f\ninAir: %s\ndecrease: %.3f\nspeedDiff: %.3f\nalt: %.3f\ndistance: %.3f",
+						landTime or "0",
+						plane.unit:inAir() and "True" or "false",
+						previousData.speed - plane.speed,
+						lso.Converter.MS_KNOT(plane.groundSpeed - lso.Carrier:getSpeed()),
+						plane.altitude - lso.Carrier.data.offset.y,
+						plane.distance
+					), 5, true, "trackDataLanding")
 					if (landTime == nil and ((not plane.unit:inAir()) or (plane.groundSpeed - lso.Carrier:getSpeed()) < lso.Converter.KNOT_MS(20) or (previousData.speed - plane.speed) > 20)) then -- 迅速减速，着舰完成
 						landTime = timer.getTime()
 					end
@@ -3061,7 +3176,7 @@ function lso.LSO:track(plane)
 					
 				end
 				
-				-- lso.print(lso.utils.tableShow(trackData:getData()).."\ngsErrorFix: "..gsError.."\nangleErrorFix: "..angleError.."\nvsVariation: "..vsVariation.."\ngsVariation: "..gsVariation, 5, true, "trackData")
+				lso.print(lso.utils.tableShow(trackData:getData()).."\ngsErrorFix: "..gsError.."\nangleErrorFix: "..angleError.."\nvsVariation: "..vsVariation.."\ngsVariation: "..gsVariation, 5, true, "trackData")
 				return timer.getTime() + 0.1
 			else
 				-- env.error("LSO lost track.")
