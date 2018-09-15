@@ -2797,7 +2797,7 @@ function lso.LSO:track(plane)
 	end
 	local trackFrame = function(args, trackTime)
 		local status, err = pcall(function()	
-			if (plane:updateData() and lso.process.getStatus(plane) == lso.process.Status.PADDLES) then -- 更新飞行数据
+			if (plane:updateData() and lso.process.getStatus(plane) == lso.process.Status.PADDLES + lso.process.Status.BREAK) then -- 更新飞行数据
 			
 				-- 检查是否进入下滑道
 				if (not inGroove) then
@@ -2869,6 +2869,14 @@ function lso.LSO:track(plane)
 				
 				-- 当剩余距离小于20m时停止指挥，开始连续检测是否成功钩上
 				if (plane.rtg < 20 and previousData) then
+					lso.print(string.format("landTime: %.3f\ninAir: %s\ndecrease: %.3f\nspeedDiff: %.3f\nalt: %.3f\ndistance: %.3f",
+						landTime or "0",
+						plane.unit:inAir() and "True" or "false",
+						previousData.speed - plane.speed,
+						lso.Converter.MS_KNOT(plane.groundSpeed - lso.Carrier:getSpeed()),
+						plane.altitude - lso.Carrier.data.offset.y,
+						plane.distance
+					), 5, true, "trackDataLanding")
 					if (landTime == nil and ((not plane.unit:inAir()) or (plane.groundSpeed - lso.Carrier:getSpeed()) < lso.Converter.KNOT_MS(20) or (previousData.speed - plane.speed) > 20)) then -- 迅速减速，着舰完成
 						landTime = timer.getTime()
 					end
@@ -3070,7 +3078,7 @@ function lso.LSO:track(plane)
 					
 				end
 				
-				-- lso.print(lso.utils.tableShow(trackData:getData()).."\ngsErrorFix: "..gsError.."\nangleErrorFix: "..angleError.."\nvsVariation: "..vsVariation.."\ngsVariation: "..gsVariation, 5, true, "trackData")
+				lso.print(lso.utils.tableShow(trackData:getData()).."\ngsErrorFix: "..gsError.."\nangleErrorFix: "..angleError.."\nvsVariation: "..vsVariation.."\ngsVariation: "..gsVariation, 5, true, "trackData")
 				return timer.getTime() + 0.1
 			else
 				-- env.error("LSO lost track.")
