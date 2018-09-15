@@ -1,5 +1,7 @@
 # DCS-SmartLSO
 
+![](https://i0.hdslb.com/bfs/article/1fac2fb036b58dccc5bdf1373ed01a5ea9d7fbc2.jpg)
+
 ## 1. 前言：
 
 从 F/A-18C 模组预售之前一直到现在，断断续续开发了近半年的 Smart LSO 脚本终于能够供大家使用了。虽然现在离最终的效果还差了一大截，但我还是决定发布给大家试用。
