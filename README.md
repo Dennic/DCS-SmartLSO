@@ -20,6 +20,12 @@ Smart LSO 是我正在开发的一个 DCS 任务脚本，主要用于模拟美�
 
 ## 3. 使用方法：
 
+**\*\* 注意 \*\***
+
+**请确保每个群组（Group）内最多只有 1 个客户端（Client）单位，即将客户端（Client）单位分开到不同的群组（Group）中。**
+
+**这是一个历史遗留问题，由于早期的 DCS 并不支持同一群组中出现多个客户端（Client）单位，所以任务脚本引擎所提供的部分 API 所支持的最小范围为群组（Group）。**
+
 使用步骤如下：
 
 1. 下载最新的 Smart LSO 脚本（zip 压缩包），并解压。 [【发布下载地址】](https://github.com/Dennic/DCS-SmartLSO/releases)
