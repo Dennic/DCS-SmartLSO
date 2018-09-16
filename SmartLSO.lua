@@ -2029,23 +2029,18 @@ end
 
 
 lso.Menu = {}
-lso.Menu.Command = {
-	CHECK_IN	= {text="Check in", handler="checkIn"},
-	IN_SIGHT	= {text="In Sight", handler="inSight"},
-	INFO 		= {text="Information", handler="information"},
-	EMERGENCY	= {text="Emergency", handler="emergency"},
-	ABORT 		= {text="Abort Landing", handler="abort"},
-	DEPART 		= {text="Depart", handler="depart"},
+-- 默认菜单
+lso.Menu.defaultMenu = {
+	[1] = {tag="CHECK_IN", 	text="Check in", 		handler="checkIn"},
+	[2] = {tag="IN_SIGHT", 	text="In Sight", 		handler="inSight"},
+	[3] = {tag="INFO", 		text="Information", 	handler="information"},
+	[4] = {tag="EMERGENCY", text="Emergency", 		handler="emergency"},
+	[5] = {tag="ABORT", 	text="Abort Landing", 	handler="abort"},
+	[6] = {tag="DEPART", 	text="Depart", 			handler="depart"},
 }
-lso.Menu.order = {
-	[1] = lso.Menu.Command.CHECK_IN,
-	[2] = lso.Menu.Command.IN_SIGHT,
-	[3] = lso.Menu.Command.INFO,
-	[4] = lso.Menu.Command.EMERGENCY,
-	[5] = lso.Menu.Command.ABORT,
-	[6] = lso.Menu.Command.DEPART,
-}
-lso.Menu.path = {}
+lso.Menu.Command = {} -- 所有菜单
+lso.Menu.order = {} -- 菜单顺序
+lso.Menu.path = {} -- 菜单路径
 function lso.Menu:registerMenu(tag, text, handler, order)
 	assert(type(tag) == "string", string.format("bad argument #1 (tag) to 'lso.Menu:registerMenu' (string expected, got %s)", type(tag)))
 	assert(type(text) == "string", string.format("bad argument #2 (text) to 'lso.Menu:registerMenu' (string expected, got %s)", type(text)))
@@ -2053,8 +2048,14 @@ function lso.Menu:registerMenu(tag, text, handler, order)
 	assert(order == nil or type(order) == "number", string.format("bad argument #4 (order) to 'lso.Menu:registerMenu' (number expected, got %s)", type(order)))
 	assert(self.Command[tag] == nil, string.format("Fail to register menu (Tag \"%s\"already exist).", tag))
 	self.Command[tag] = {text=text, handler=handler}
-	table.insert(self.order, order or 1, self.Command[tag])
+	table.insert(self.order, order or (#self.order + 1), self.Command[tag])
 	return self.Command[tag]
+end
+function lso.Menu:init()
+	for i, menu in ipairs(self.defaultMenu) do
+		local handler = type(menu.handler) == "string" and self.handler[menu.handler] or menu.handler
+		lso.Menu:registerMenu(menu.tag, menu.text, handler, i)
+	end
 end
 function lso.Menu:addMenu(unit, menu, handler)
 	if (unit.__class == "Plane") then
@@ -3321,6 +3322,7 @@ function lso.init()
 	end
 	-- lso.mainProcess = lso.addCheckFrame(lso) -- 添加主检测帧程序
 	lso.DB.init() -- 初始化数据库
+	lso.Menu:init() -- 初始化菜单管理模块
 	lso.Marshal:init() -- 初始化 Marshal 模块
 	lso.Tower:init() -- 初始化 Tower 模块
 	lso.LSO:init() -- 初始化 LSO 模块
