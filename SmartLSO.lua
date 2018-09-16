@@ -3132,7 +3132,7 @@ function lso.LSO:track(plane)
 					end
 					
 					-- 判断Foul Deck复飞
-					if (lso.Carrier.turning or (stage ~= lso.LSO.Stage.AT_RAMP and plane.rtg < 1500 and lso.Carrier.foulDeck)) then
+					if (lso.Carrier.turning or (stage ~= lso.LSO.Stage.AT_RAMP and plane.rtg < 1000 and lso.Carrier.foulDeck)) then
 						if trackCommand(self.command.FOUL_DECK, true, trackTime) then
 							result = lso.LSO.Result.WAVEOFF + result
 							cause = lso.LSO.Cause.FOUL_DECK + cause
