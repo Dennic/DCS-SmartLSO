@@ -908,11 +908,12 @@ function lso.Carrier:onFrame()
 					local plane = lso.Plane.get(unit)
 					if plane then
 						if (plane.onRunway == true and onRunway == true) then -- 在跑道
-							if ((self.foulTime[unit:getName()] == nil or timer.getTime() - self.foulTime[unit:getName()] > 10)
+							if ((plane.foulTime == nil or timer.getTime() - plane.foulTime > 10)
+								and lso.process.getStatus(unit) == lso.process.Status.NONE
 								and lso.Carrier.recovery 
 								and #lso.process.getUnitsInStatus(lso.process.Status.PADDLES) == 0
 							) then
-								self.foulTime[unit:getName()] = timer.getTime()
+								plane.foulTime = timer.getTime()
 								local partName = "plane"
 								switch(part,
 									{1, function()
@@ -939,7 +940,7 @@ function lso.Carrier:onFrame()
 								lso.RadioCommand:new(string.format("%s.onRunway", plane.number), "Air Boss", string.format("%s, Move your %s out of the foul lines.", plane.number, partName), nil, 2, lso.RadioCommand.Priority.NORMAL):send()
 							end
 						elseif (plane.onRunway == true and onRunway == false) then -- 出跑道
-							self.foulTime[unit:getName()] = nil
+							plane.foulTime = nil
 						end
 						plane.onRunway = onRunway
 					end
@@ -959,6 +960,7 @@ end
 lso.Plane = {__class="Plane",
 	case, -- 飞机正在执行的回收状况
 	onRunway, -- 是否在跑道上
+	foulTime, -- 上次检查进入跑道时间
 	unit, -- 飞机单位
 	name, -- 飞机单位名称
 	model, -- 飞机型号
@@ -2868,6 +2870,7 @@ function lso.LSO:track(plane)
 	end
 	local landFinish = function()
 		lso.LSO.contact = false
+		plane.foulTime = timer.getTime() + 10
 		lso.process.removePlane(plane.unit)
 	end
 	local goAround = function()
@@ -2886,8 +2889,8 @@ function lso.LSO:track(plane)
 			mist.debug.writeData(mist.utils.serialize, {"data", trackData}, "TrackData.text")
 			lso.print("TrackData dump to \"Saved Games/DCS/Logs/TrackData.text\"", 5, true)
 		end
-		if type(lso.LSO.comment) == "function" then
-			lso.LSO:comment(trackData, result, cause, wire)
+		if type(lso.Comment) == "table" then
+			lso.Broadcast:send(lso.Broadcast.event.TRACK_FINISH, trackData, result, cause, wire)
 		else
 			if (result == lso.LSO.Result.LAND) then
 				lso.LSO:grade(trackData, result, cause, wire)
@@ -2978,6 +2981,7 @@ function lso.LSO:track(plane)
 					), 5, true, "trackDataLanding")
 					if (landTime == nil and ((not plane.unit:inAir()) or (plane.groundSpeed - lso.Carrier:getSpeed()) < lso.Converter.KNOT_MS(20) or (previousData.speed - plane.speed) > 20)) then -- 迅速减速，着舰完成
 						landTime = timer.getTime()
+						result = lso.LSO.Result.LAND + result
 					end
 					if (landTime ~= nil) then
 						if (timer.getTime() - landTime > 8) then
@@ -2995,7 +2999,6 @@ function lso.LSO:track(plane)
 								wire = 4
 							end
 							if wire then
-								result = lso.LSO.Result.LAND + result
 								lso.print(string.format("Fuel Used: %.3f", lso.Converter.KG_LB(previousData.fuel - plane.fuel)), 10, true)
 								if (lso.Converter.KG_LB(previousData.fuel - plane.fuel) < 6) then
 									cause = lso.LSO.Cause.IDLE + cause
